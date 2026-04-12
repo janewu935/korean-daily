@@ -7,45 +7,69 @@ import io
 # 設定網頁標題
 st.set_page_config(page_title="韓語筆記", page_icon="💙")
 
-# 自定義 CSS 樣式：強化對比度與 TWS 氛圍
+# --- 自定義 CSS 樣式：色彩統整 ---
+# 應援訊息背景藍：#E6F3FF
+# 應援訊息文字藍：#007FFF
 st.markdown("""
     <style>
     /* 整體背景 */
     .stApp {
-        background-color: #F0F8FF;
+        background-color: #F8FBFF;
     }
-    /* 標題與文字顏色強化 */
+    
+    /* 標題顏色 */
     h1, h2, h3 {
-        color: #0047AB !important; /* 深青藍色 */
+        color: #007FFF !important;
         font-weight: bold;
     }
-    p, span, label {
-        color: #1A1A1A !important; /* 近乎黑色，確保閱讀不吃力 */
-        font-weight: 500;
-    }
-    /* 標籤頁字體強化 */
-    .stTabs [data-baseweb="tab"] {
-        color: #0047AB;
-        font-weight: bold;
-        font-size: 18px;
-    }
-    /* 按鈕樣式 */
-    .stButton>button {
-        background-color: #007FFF;
-        color: #FFFFFF !important;
-        border-radius: 20px;
-        font-weight: bold;
-        border: 2px solid #0047AB;
-    }
-    /* 訊息方框文字 */
+    
+    /* 應援訊息框樣式 */
     .stInfo {
-        background-color: #E6F3FF;
-        border-left: 5px solid #007FFF;
-        color: #0047AB !important;
+        background-color: #E6F3FF !important;
+        border-left: 5px solid #007FFF !important;
+        color: #007FFF !important;
     }
-    /* 修正輸入框文字顏色 */
-    input {
-        color: #1A1A1A !important;
+
+    /* 按鈕樣式：改為與應援框一致的藍色 */
+    .stButton>button {
+        background-color: #007FFF !important;
+        color: white !important;
+        border-radius: 12px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+    }
+
+    /* 下拉選單 (Multiselect) 樣式 */
+    span[data-baseweb="tag"] {
+        background-color: #007FFF !important;
+        color: white !important;
+    }
+    div[data-baseweb="select"] {
+        border-color: #007FFF !important;
+    }
+
+    /* 標籤頁 (Tabs) 樣式：選中時的底線與顏色 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre;
+        background-color: transparent;
+        border-radius: 4px 4px 0px 0px;
+        color: #666;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: transparent !important;
+        color: #007FFF !important;
+        border-bottom: 3px solid #007FFF !important;
+        font-weight: bold;
+    }
+
+    /* 全局文字顏色強化 */
+    p, span, label {
+        color: #333333 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -68,7 +92,7 @@ def play_audio(text):
         tts.write_to_fp(fp)
         st.audio(fp)
     except:
-        st.error("發音產生失敗")
+        st.error("發音失敗")
 
 # --- 主介面 ---
 logo_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/TWS_Logo.svg/512px-TWS_Logo.svg.png" 
@@ -110,8 +134,12 @@ df = load_data()
 if not df.empty:
     st.subheader("🎯 章節複習")
     all_chapters = sorted(df['chapter'].astype(str).unique().tolist())
+    
+    # 下拉選單
     sel_ch = st.multiselect("選擇章節：", all_chapters)
     
+    st.divider()
+
     tabs = st.tabs(["📖 單字", "📝 文法", "📢 發音"])
     categories = ["單字", "文法", "發音"]
 
@@ -155,7 +183,7 @@ if not df.empty:
                     st.rerun()
 
     st.divider()
-    st.markdown(f"**[🔗 點我打開試算表新增單字](https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit)**")
+    st.markdown(f"**[🔗 點我打開試算表新增單字]({url if 'url' in locals() else 'https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit'})**")
 
 else:
     st.warning("試算表讀取不到資料，請檢查內容！")
