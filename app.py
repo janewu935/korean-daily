@@ -95,7 +95,7 @@ def play_audio(text):
         st.error("發音失敗")
 
 # --- 主介面 ---
-logo_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/TWS_Logo.svg/512px-TWS_Logo.svg.png" 
+logo_url = "https://play.google.com/store/apps/details?id=com.hybe.twsapp&hl=zh_TW" 
 
 col_logo, col_title = st.columns([1, 4])
 with col_logo:
