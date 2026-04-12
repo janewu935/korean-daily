@@ -5,47 +5,72 @@ from gtts import gTTS
 import io
 import re
 
-# 設定
 st.set_page_config(page_title="韓語筆記", page_icon="💙")
 
-# --- 自定義 CSS 樣式 ---
+# --- CSS 樣式：TWS 應援藍視覺 ---
 st.markdown("""
     <style>
     .stApp { background-color: #F8FBFF; }
-    .main-title { color: #007FFF !important; font-size: 38px; font-weight: 800; text-align: center; }
-    .stInfo { background-color: #E6F3FF !important; border-left: 5px solid #007FFF !important; color: #007FFF !important; }
-    .stButton>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; font-weight: bold; }
+    .main-title { color: #007FFF !important; font-size: 38px; font-weight: 800; text-align: center; margin-bottom: 5px; }
+    .stInfo { background-color: #E6F3FF !important; border-left: 5px solid #007FFF !important; color: #007FFF !important; font-weight: bold; }
+    .stButton>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; font-weight: bold; width: 100%; border: none; }
     p, span, label { color: #1A1A1A !important; font-weight: 600; }
+    h3 { color: #007FFF !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 1. 內建題庫產生器 (針對大家的韓國語第一冊)
-def generate_random_quiz():
-    database = [
-        {"ch": "L1", "cn": "我是台灣人。", "kr": "저는 대만 사람이에요."},
-        {"ch": "L1", "cn": "我是工程師。", "kr": "저는 엔지니어예요."},
-        {"ch": "L2", "cn": "這不是手機。", "kr": "이것은 휴대폰이 아니에요."},
-        {"ch": "L2", "cn": "那是筆記本嗎？", "kr": "저것은 공책이에요?"},
-        {"ch": "L3", "cn": "弟弟在教室裡。", "kr": "남동생이 교실에 있어요."},
-        {"ch": "L3", "cn": "椅子上面有貓。", "kr": "의자 위에 고양이가 있어요."},
-        {"ch": "L4", "cn": "今天去銀行。", "kr": "오늘은 은행에 가요."},
-        {"ch": "L4", "cn": "爸爸在睡覺。", "kr": "아버지가 자요."},
-        {"ch": "L5", "cn": "昨天見了朋友。", "kr": "어제 친구를 만났어요."},
-        {"ch": "L5", "cn": "上週末做了運動。", "kr": "지난 주말에 운동을 했어요."},
-        {"ch": "L6", "cn": "我喝咖啡和水。", "kr": "커피하고 물을 마셔요."},
-        {"ch": "L6", "cn": "買了麵包跟牛奶。", "kr": "빵이랑 우유를 샀어요."},
-        {"ch": "L7", "cn": "從家裡到公司。", "kr": "집에서 회사까지."},
-        {"ch": "L7", "cn": "去百貨公司買東西。", "kr": "백화점에 쇼핑하러 가요."},
-        {"ch": "L8", "cn": "現在兩點三十分。", "kr": "지금 두 시 삼십 분이에요."},
-        {"ch": "L8", "cn": "星期三有韓語課。", "kr": "수요일에 한국어 수업이 있어요."},
-        {"ch": "L9", "cn": "天氣雖然冷，但很好。", "kr": "날씨가 춥지만 좋아요."},
-        {"ch": "L10", "cn": "請給我三顆蘋果。", "kr": "사과 세 개 주세요."},
-        {"ch": "L11", "cn": "我想看電影。", "kr": "영화 보고 싶어요."},
-        {"ch": "L12", "cn": "這件衣服很漂亮。", "kr": "이 옷이 아주 예뻐요."}
+# --- 1. 究極語法拼湊引擎 (L1-L12) ---
+def generate_ultimate_quiz():
+    subjects = [
+        {"cn": "我", "kr": "저는"}, {"cn": "老師", "kr": "선생님은"}, 
+        {"cn": "朋友", "kr": "친구는"}, {"cn": "妹妹", "kr": "여동생은"},
+        {"cn": "歐巴", "kr": "오빠는"}, {"cn": "姐姐", "kr": "언니는"}
     ]
-    return random.choice(database)
+    # 動作零件庫
+    actions = [
+        {"cn": "吃麵包", "base": "빵을 먹다", "pol": "빵을 먹어요", "past": "빵을 먹었어요", "want": "빵을 먹고 싶어 해요", "neg": "빵을 먹지 않아요", "req": "빵을 먹어 주세요", "can": "빵을 먹을 수 있어요"},
+        {"cn": "喝咖啡", "base": "커피를 마시다", "pol": "커피를 마셔요", "past": "커피를 마셨어요", "want": "커피를 마시고 싶어 해요", "neg": "커피를 마시지 않아요", "req": "커피를 마셔 주세요", "can": "커피를 마실 수 있어요"},
+        {"cn": "看電影", "base": "영화를 보다", "pol": "영화를 봐요", "past": "영화를 봤어요", "want": "영화를 보고 싶어 해요", "neg": "영화를 보지 않아요", "req": "영화를 봐 주세요", "can": "영화를 볼 수 있어요"},
+        {"cn": "買衣服", "base": "옷을 사다", "pol": "옷을 사요", "past": "옷을 샀어요", "want": "옷을 사고 싶어 해요", "neg": "옷을 사지 않아요", "req": "옷을 사 주세요", "can": "옷을 살 수 있어요"},
+        {"cn": "學習韓語", "base": "한국어를 공부하다", "pol": "한국어를 공부해요", "past": "한국어를 공부했어요", "want": "한국어를 공부하고 싶어 해요", "neg": "한국어를 공부하지 않아요", "req": "한국어를 공부해 주세요", "can": "한국어를 공부할 수 있어요"},
+        {"cn": "做運動", "base": "운동을 하다", "pol": "운동을 해요", "past": "운동을 했어요", "want": "운동을 하고 싶어 해요", "neg": "운동을 하지 않아요", "req": "운동을 해 주세요", "can": "운동을 할 수 있어요"},
+        {"cn": "睡覺", "base": "자다", "pol": "자요", "past": "잤어요", "want": "자고 싶어 해요", "neg": "자지 않아요", "req": "자 주세요", "can": "잘 수 있어요"}
+    ]
+    
+    # 隨機抽取文法時態
+    grammar_type = random.choice(["pol", "past", "want", "neg", "req", "can"])
+    sub = random.choice(subjects)
+    act = random.choice(actions)
+    
+    kr_text = ""
+    cn_text = f"{sub['cn']}"
+    
+    if grammar_type == "pol":
+        kr_text = f"{sub['kr']} {act['pol']}"
+        cn_text += f"{act['cn']}。"
+    elif grammar_type == "past":
+        kr_text = f"{sub['kr']} {act['past']}"
+        cn_text += f"昨天{act['cn']}了。"
+    elif grammar_type == "neg":
+        kr_text = f"{sub['kr']} {act['neg']}"
+        cn_text += f"不{act['cn']}。"
+    elif grammar_type == "req":
+        kr_text = f"{act['req']}"
+        cn_text = f"請{act['cn']}。"
+    elif grammar_type == "can":
+        kr_text = f"{sub['kr']} {act['can']}"
+        cn_text += f"會{act['cn']}。"
+    elif grammar_type == "want":
+        if sub['cn'] == "我":
+            kr_text = f"{sub['kr']} {act['want'].replace('해 해요', '해요')}"
+            cn_text += f"想{act['cn']}。"
+        else:
+            kr_text = f"{sub['kr']} {act['want']}"
+            cn_text += f"想{act['cn']}。"
+            
+    return {"cn": cn_text, "kr": kr_text}
 
-# 2. 核心功能函數
+# --- 2. 工具函數 ---
 def play_audio(text):
     try:
         tts = gTTS(text=str(text), lang='ko')
@@ -53,54 +78,51 @@ def play_audio(text):
         tts.write_to_fp(fp)
         st.audio(fp)
     except:
-        st.error("發音失敗")
+        st.error("語音產生失敗")
 
 def clean_text(text):
     return re.sub(r'[^\w\s]', '', str(text)).strip()
 
-# --- 主介面 ---
+# --- 3. 介面設計 ---
 st.markdown('<p class="main-title">💙 韓語筆記 💙</p>', unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #007FFF; font-weight: bold;'>24/7 With Us! 大家的韓國語挑戰模式</p>", unsafe_allow_html=True)
 
-# 3. 隨機翻譯挑戰區
-st.subheader("✍️ 大家的韓國語 L1-L12 隨機挑戰")
+# 隨機翻譯挑戰
+st.subheader("✍️ 文法拼湊大挑戰")
 
-if 'daily_quiz' not in st.session_state:
-    st.session_state.daily_quiz = generate_random_quiz()
-if 'daily_input_id' not in st.session_state:
-    st.session_state.daily_input_id = 0
+if 'dyn_quiz' not in st.session_state:
+    st.session_state.dyn_quiz = generate_ultimate_quiz()
+if 'dyn_input_id' not in st.session_state:
+    st.session_state.dyn_input_id = 0
 
-dq = st.session_state.daily_quiz
+dq = st.session_state.dyn_quiz
 
 with st.container():
-    st.info(f"💡 **翻譯題目：** 「 {dq['cn']} 」")
+    st.info(f"💡 **請翻譯：** 「 {dq['cn']} 」")
     
-    # 動態 Key 確保清空
-    user_trans = st.text_input("輸入韓文：", key=f"daily_input_{st.session_state.daily_input_id}")
+    # 這裡的 Key 會隨 ID 變動，確保「換一題」時輸入框清空
+    user_trans = st.text_input("在此輸入韓文答案：", key=f"dyn_in_{st.session_state.dyn_input_id}")
     
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         if st.button("驗證答案"):
-            if not user_trans:
-                st.warning("寫點東西吧！")
-            else:
+            if user_trans:
                 if clean_text(user_trans) == clean_text(dq['kr']):
-                    st.balloons()
-                    st.success("🎉 正確！妳好棒！")
-                    play_audio(dq['kr'])
+                    st.balloons(); st.success("🎉 太厲害了！完全正確！")
                 else:
-                    st.error("⚠️ 發現 Bug！")
-                    st.write(f"**正確解答：** {dq['kr']}")
-                    play_audio(dq['kr'])
-    
-    with col2:
-        if st.button("換下一題挑戰"):
-            st.session_state.daily_quiz = generate_random_quiz()
-            st.session_state.daily_input_id += 1
+                    st.error(f"❌ 錯誤！正確答案是：\n{dq['kr']}")
+                play_audio(dq['kr'])
+            else:
+                st.warning("要先打字喔！")
+    with c2:
+        if st.button("換下一題"):
+            st.session_state.dyn_quiz = generate_ultimate_quiz()
+            st.session_state.dyn_input_id += 1
             st.rerun()
 
 st.divider()
 
-# --- 4. 原有的 Excel 複習 (妳有空再輸入單字就好) ---
+# --- 4. 原有的 Excel 讀取功能 ---
 @st.cache_data(ttl=5)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit?usp=sharing"
@@ -114,9 +136,9 @@ def load_data():
 
 df = load_data()
 if not df.empty:
-    st.subheader("🎯 我的 Excel 題庫複習")
+    st.subheader("🎯 我的單字庫複習")
     all_chapters = sorted(df['chapter'].astype(str).unique().tolist())
-    sel_ch = st.multiselect("篩選章節：", all_chapters)
+    sel_ch = st.multiselect("篩選 Excel 章節：", all_chapters)
     
     tabs = st.tabs(["📖 單字", "📝 文法", "📢 發音"])
     cats = ["單字", "文法", "發音"]
@@ -132,7 +154,7 @@ if not df.empty:
                 if q_key not in st.session_state: st.session_state[q_key] = tmp.sample(1).iloc[0]
                 item = st.session_state[q_key]
                 st.write(f"📍 **章節：{item['chapter']}**")
-                st.markdown(f"### {item['cn']}")
+                st.markdown(f"### 題目：{item['cn']}")
                 u_in = st.text_input("輸入回答", key=f"input_{target_cat}_{st.session_state[tab_id_key]}")
                 if st.button("檢查", key=f"btn_{target_cat}"):
                     if clean_text(u_in) == clean_text(str(item['kr'])):
@@ -144,3 +166,6 @@ if not df.empty:
                     if q_key in st.session_state: del st.session_state[q_key]
                     st.session_state[tab_id_key] += 1
                     st.rerun()
+
+st.divider()
+st.markdown(f"**[🔗 打開 Excel 試算表](https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit)**")
