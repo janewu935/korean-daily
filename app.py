@@ -4,7 +4,6 @@ import random
 from gtts import gTTS
 import io
 import re
-import time
 
 # 設定
 st.set_page_config(page_title="韓語筆記", page_icon="💙")
@@ -21,12 +20,15 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 1. 讀取與發音
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5) # 縮短快取時間，讓 Excel 更新更快反映
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit?usp=sharing"
     csv_url = url.replace('/edit?usp=sharing', '/export?format=csv&gid=0')
     try:
-        return pd.read_csv(csv_url).dropna(subset=['kr', 'cn'])
+        df = pd.read_csv(csv_url)
+        # 統一欄位名稱，避免 Excel 標題打錯
+        df.columns = [c.strip().lower() for c in df.columns]
+        return df.dropna(subset=['kr', 'cn'])
     except:
         return pd.DataFrame()
 
@@ -45,100 +47,78 @@ def clean_text(text):
 # --- 主介面 ---
 st.markdown('<p class="main-title">💙 韓語筆記 💙</p>', unsafe_allow_html=True)
 
-# 2. 每日翻譯挑戰區
-lesson_quotes = [
-    {"ch": "L1 (이다)", "cn": "我是台灣人。", "kr": "저는 대만 사람이에요."},
-    {"ch": "L2 (이/가 아니다)", "cn": "這不是手機。", "kr": "이것은 휴대폰이 아니에요."},
-    {"ch": "L3 (있다/없다)", "cn": "弟弟在教室裡。", "kr": "남동생이 교실에 있어요."},
-    {"ch": "L4 (아요/어요)", "cn": "我也買蘋果。", "kr": "저도 사과를 사요."},
-    {"ch": "L5 (았/었)", "cn": "昨天做了運動。", "kr": "어제 운동을 했어요."},
-    {"ch": "L6 (하고/와/과)", "cn": "我喝咖啡和水。", "kr": "커피하고 물을 마셔요."},
-]
+df = load_data()
 
-# 初始化題目與輸入框的「隨機 ID」
-if 'daily_quiz' not in st.session_state:
-    st.session_state.daily_quiz = random.choice(lesson_quotes)
+# 2. 每日翻譯挑戰邏輯 (從 Excel 動態讀取)
+st.subheader("✍️ 今日文法挑戰：互動翻譯")
+
+# 建立題庫：優先抓 Excel 裡 type 是 '文法' 或 '每日句' 的資料
+if not df.empty:
+    quiz_pool = df[df['type'].isin(['文法', '每日句'])].to_dict('records')
+else:
+    quiz_pool = []
+
+# 如果 Excel 沒資料，就用備用題庫（避免網頁壞掉）
+if not quiz_pool:
+    quiz_pool = [{"chapter": "L1", "cn": "我是台灣人。", "kr": "저는 대만 사람이에요."}]
+
+# 初始化狀態
+if 'daily_quiz' not in st.session_state or st.session_state.get('refresh_quiz', False):
+    st.session_state.daily_quiz = random.choice(quiz_pool)
+    st.session_state.refresh_quiz = False
+
 if 'daily_input_id' not in st.session_state:
     st.session_state.daily_input_id = 0
 
 dq = st.session_state.daily_quiz
 
 with st.container():
-    st.info(f"💡 **請翻譯：** 「 {dq['cn']} 」")
+    st.info(f"💡 **來自第 {dq['chapter']} 章的挑戰：**\n### 「 {dq['cn']} 」")
     
-    # 關鍵：這裡的 key 加上了隨機 ID，變動時會強制清空
-    user_trans = st.text_input("在下方輸入韓文：", key=f"daily_input_{st.session_state.daily_input_id}")
+    # 關鍵：使用動態 Key 確保清空
+    user_trans = st.text_input("輸入韓文翻譯：", key=f"daily_input_{st.session_state.daily_input_id}")
     
     col1, col2 = st.columns(2)
     with col1:
         if st.button("驗證我的翻譯"):
             if not user_trans:
-                st.warning("要先輸入內容才能驗證喔！")
+                st.warning("寫點東西再驗證吧！")
             else:
                 if clean_text(user_trans) == clean_text(dq['kr']):
                     st.balloons()
-                    st.success("🎉 正確！")
+                    st.success("🎉 太強了！完全正確。")
                     play_audio(dq['kr'])
                 else:
-                    st.error("⚠️ 發現錯誤！")
-                    st.write(f"**你的輸入：** {user_trans}")
+                    st.error("⚠️ 這裡有 Bug 喔！")
                     st.write(f"**正確解答：** {dq['kr']}")
                     play_audio(dq['kr'])
     
     with col2:
-        if st.button("換一題"):
-            st.session_state.daily_quiz = random.choice(lesson_quotes)
-            # 更改 ID，讓 Streamlit 生成一個全新的輸入框
-            st.session_state.daily_input_id += 1 
+        if st.button("換一題挑戰"):
+            st.session_state.refresh_quiz = True
+            st.session_state.daily_input_id += 1
             st.rerun()
 
 st.divider()
 
-# --- 3. 原有的 Excel 複習核心 ---
-df = load_data()
+# --- 3. 章節題庫複習 (原本的功能) ---
 if not df.empty:
-    st.subheader("🎯 章節題庫複習")
+    st.subheader("🎯 分類題庫複習")
     all_chapters = sorted(df['chapter'].astype(str).unique().tolist())
     sel_ch = st.multiselect("選擇複習章節：", all_chapters)
     
     tabs = st.tabs(["📖 單字", "📝 文法", "📢 發音"])
+    cats = ["單字", "文法", "發音"]
 
     for i, tab in enumerate(tabs):
         with tab:
-            cat = ["單字", "文法", "發音"][i]
-            tmp = df[df['type'] == cat]
+            target_cat = cats[i]
+            tmp = df[df['type'] == target_cat]
             if sel_ch: tmp = tmp[tmp['chapter'].astype(str).isin(sel_ch)]
             
             if not tmp.empty:
-                # 每個 Tab 也給它一個獨立的 input_id
-                tab_id_key = f"input_id_{cat}"
-                if tab_id_key not in st.session_state:
-                    st.session_state[tab_id_key] = 0
+                tab_id_key = f"input_id_{target_cat}"
+                if tab_id_key not in st.session_state: st.session_state[tab_id_key] = 0
                 
-                quiz_key = f"quiz_item_{cat}"
-                if quiz_key not in st.session_state:
-                    st.session_state[quiz_key] = tmp.sample(1).iloc[0]
-                
-                item = st.session_state[quiz_key]
-                st.write(f"📍 **章節：{item['chapter']}**")
-                st.markdown(f"### 題目：{item['cn']}")
-
-                # 同樣的 Key 隨機化技巧
-                u_in = st.text_input("輸入韓文回答", key=f"input_{cat}_{st.session_state[tab_id_key]}")
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("檢查答案", key=f"btn_{cat}"):
-                        if clean_text(u_in) == clean_text(str(item['kr'])):
-                            st.balloons(); st.success("正確！")
-                        else:
-                            st.error(f"正確答案：{item['kr']}")
-                        play_audio(item['kr'])
-                with c2:
-                    if st.button("下一題", key=f"next_{cat}"):
-                        del st.session_state[quiz_key]
-                        st.session_state[tab_id_key] += 1 # 強制刷新輸入框
-                        st.rerun()
-
-    st.divider()
-    st.markdown(f"**[🔗 打開 Excel 試算表](https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit)**")
+                q_key = f"quiz_item_{target_cat}"
+                if q_key not in st.session_state: st.session_state[q_key] = tmp.sample
