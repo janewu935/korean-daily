@@ -121,4 +121,26 @@ if not df.empty:
                 if tab_id_key not in st.session_state: st.session_state[tab_id_key] = 0
                 
                 q_key = f"quiz_item_{target_cat}"
-                if q_key not in st.session_state: st.session_state[q_key] = tmp.sample
+                if q_key not in st.session_state: st.session_state[q_key] = tmp.sample(1).iloc[0]
+                
+                item = st.session_state[q_key]
+                st.write(f"📍 **章節：{item['chapter']}**")
+                st.markdown(f"### 翻譯題目：{item['cn']}")
+
+                u_in = st.text_input("在此輸入回答", key=f"input_{target_cat}_{st.session_state[tab_id_key]}")
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("檢查", key=f"btn_{target_cat}"):
+                        if clean_text(u_in) == clean_text(str(item['kr'])):
+                            st.balloons(); st.success("正確！")
+                        else:
+                            st.error(f"正確答案：{item['kr']}")
+                        play_audio(item['kr'])
+                with c2:
+                    if st.button("下一題", key=f"next_{target_cat}"):
+                        if q_key in st.session_state: del st.session_state[q_key]
+                        st.session_state[tab_id_key] += 1
+                        st.rerun()
+else:
+    st.warning("Excel 裡還沒有資料喔，快去新增吧！")
