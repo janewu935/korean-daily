@@ -87,7 +87,7 @@ def play_audio(text):
 
 # 使用文字設計取代圖片 Logo
 st.markdown('<p class="main-title">💙 韓語筆記 💙</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">24/7 With Us! 宜真的專屬學習空間</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">24/7 With Us! </p>', unsafe_allow_html=True)
 
 # --- 應援金句區 ---
 tws_quotes = [
