@@ -93,4 +93,26 @@ if not df.empty:
                 if mode == "快速":
                     if st.button("看答案並聽發音", key=f"ans_{cat}"):
                         st.success(f"答案是：{item['kr']}")
-                        play_audio(item
+                        play_audio(item['kr'])
+                        if pd.notna(item['note']):
+                            st.caption(f"💡 備註：{item['note']}")
+                else:
+                    user_in = st.text_input("請輸入韓文拼寫", key=f"in_{cat}")
+                    if st.button("檢查答案", key=f"btn_{cat}"):
+                        if user_in.strip() == str(item['kr']).strip():
+                            st.balloons()
+                            st.success("🎉 正確！")
+                        else:
+                            st.error(f"❌ 錯誤，答案是：{item['kr']}")
+                        play_audio(item['kr'])
+
+                if st.button("下一題", key=f"next_{cat}"):
+                    if key in st.session_state:
+                        del st.session_state[key]
+                    st.rerun()
+
+    st.divider()
+    st.markdown(f"[🔗 點我打開試算表]({url if 'url' in locals() else 'https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit'})")
+
+else:
+    st.warning("試算表讀取不到資料，請檢查 Google 試算表內容！")
