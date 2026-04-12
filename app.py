@@ -32,7 +32,7 @@ st.markdown("""
 
     /* 按鈕樣式：改為與應援框一致的藍色 */
     .stButton>button {
-        background-color: #007FFF !important;
+        background-color: #E6F3FF !important;
         color: white !important;
         border-radius: 12px;
         border: none;
@@ -42,11 +42,11 @@ st.markdown("""
 
     /* 下拉選單 (Multiselect) 樣式 */
     span[data-baseweb="tag"] {
-        background-color: #007FFF !important;
+        background-color: #E6F3FF !important;
         color: white !important;
     }
     div[data-baseweb="select"] {
-        border-color: #007FFF !important;
+        border-color: #E6F3FF !important;
     }
 
     /* 標籤頁 (Tabs) 樣式：選中時的底線與顏色 */
