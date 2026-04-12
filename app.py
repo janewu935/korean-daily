@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+import random
 from gtts import gTTS
 import io
-import random
-from datetime import date
 
 st.set_page_config(page_title="宜真韓語全功能站", page_icon="🇰🇷")
 
-# --- 1. 語音功能 ---
+# --- 1. 設定與讀取 ---
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit"
+CSV_URL = SHEET_URL.replace('/edit', '/export?format=csv')
+
 def play_audio(text):
     try:
         tts = gTTS(text=text, lang='ko')
@@ -19,50 +19,77 @@ def play_audio(text):
     except:
         st.warning("語音產生失敗")
 
-# --- 2. 核心連線 (使用公開編輯網址) ---
-# 既然你已經開了「任何人皆可編輯」，我們用這個簡單路徑
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit"
+@st.cache_data(ttl=30) # 縮短快取時間至 30 秒，方便你在試算表改完後快速看到結果
+def load_data():
+    data = pd.read_csv(CSV_URL)
+    # 確保抓到正確的欄位，並過濾掉空行
+    return data.dropna(subset=['kr', 'cn'])
 
-def get_data():
-    # 使用 pandas 直接讀取公開 CSV 格式是最穩定的讀取方式
-    csv_url = SHEET_URL.replace('/edit', '/export?format=csv')
-    data = pd.read_csv(csv_url)
-    return data.dropna(how="all")
+# --- 2. 每日一句庫 ---
+quotes = [
+    {"kr": "오늘도 화이팅! 할 수 있어요.", "cn": "今天也要加油！你可以的。"},
+    {"kr": "어제보다 더 나은 오늘", "cn": "比昨天更好的今天"},
+    {"kr": "꿈을 향해 한 걸음씩.", "cn": "朝著夢想一步步前進。"}
+]
 
 # --- 3. 介面設計 ---
 st.title("🇰🇷 宜真的韓語基地")
 
+# 每日一句
+with st.container():
+    if 'daily_q' not in st.session_state:
+        st.session_state.daily_q = random.choice(quotes)
+    q = st.session_state.daily_q
+    st.info(f"✨ **今日動力**\n### {q['kr']}\n{q['cn']}")
+    if st.button("🔊 播放金句語音"):
+        play_audio(q['kr'])
+
+st.divider()
+
+# 讀取資料
 try:
-    df = get_data()
-    st.sidebar.success(f"✅ 連線成功 (單字數: {len(df)})")
-except:
-    df = pd.DataFrame(columns=["date", "kr", "cn"])
-    st.sidebar.error("❌ 讀取失敗")
+    df = load_data()
+    
+    # 側邊欄
+    st.sidebar.title("🛠️ 學習管理")
+    st.sidebar.markdown(f"[🔗 點我打開試算表]({SHEET_URL})")
+    st.sidebar.write("---")
+    st.sidebar.caption("目前的標題列應為：\nchapter, kr, cn, type, note")
 
-tab1, tab2 = st.tabs(["📝 新增單字", "📖 複習模式"])
+    # 分頁功能
+    tab1, tab2, tab3 = st.tabs(["📖 單字複習", "📝 文法練習", "📢 發音規則"])
 
-with tab1:
-    with st.form("my_form", clear_on_submit=True):
-        new_kr = st.text_input("輸入韓文 (KR)")
-        new_cn = st.text_input("輸入中文 (CN)")
-        submit = st.form_submit_button("永久存入試算表")
+    def QuizSection(category):
+        # 篩選類別
+        target_df = df[df['type'] == category]
         
-        if submit and new_kr and new_cn:
-            # 這裡我們使用一個小技巧：利用 Google Forms 概念或提醒
-            st.warning("⚠️ 寫入功能正在切換更穩定的連線方式。")
-            st.info("請點擊下方連結手動新增，或等我為你設定 Service Account 鑰匙。")
-            # 這裡提供一個最快解決方案：既然自動寫入卡住，
-            # 我們改用 st.write 顯示一個可以點擊的連結，
-            # 讓你直接在手機上打開試算表 APP 輸入，那是最快且不會失敗的。
-            st.markdown(f"[點我直接打開試算表輸入]({SHEET_URL})")
+        if target_df.empty:
+            st.write(f"目前『{category}』還沒有資料喔！")
+        else:
+            # 隨機抽題
+            item = target_df.sample(1).iloc[0]
+            
+            # 顯示章節資訊
+            st.caption(f"📍 章節：{item['chapter']}")
+            st.subheader(f"{category}挑戰")
+            st.warning(f"請翻譯：**{item['cn']}**")
+            
+            with st.expander("點我看答案與聽發音"):
+                st.success(f"結果：{item['kr']}")
+                play_audio(str(item['kr']))
+                if pd.notna(item['note']):
+                    st.info(f"💡 備註：{item['note']}")
+            
+            if st.button(f"換下一個 {category}", key=category):
+                st.rerun()
 
-with tab2:
-    if not df.empty:
-        item = df.sample(1).iloc[0]
-        st.subheader("🧠 隨機挑戰")
-        st.info(f"這個怎麼說？ **{item['cn']}**")
-        if st.button("看答案並聽發音"):
-            st.success(f"答案是：{item['kr']}")
-            play_audio(str(item['kr']))
-        if st.button("下一個"):
-            st.rerun()
+    with tab1:
+        QuizSection("單字")
+    with tab2:
+        QuizSection("文法")
+    with tab3:
+        QuizSection("發音")
+
+except Exception as e:
+    st.error("讀取失敗，請確認試算表格式與權限。")
+    st.info(f"錯誤訊息：{e}")
