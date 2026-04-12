@@ -8,6 +8,7 @@ import io
 st.set_page_config(page_title="宜真韓語基地", page_icon="🇰🇷")
 
 # 1. 讀取函數
+@st.cache_data(ttl=10)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit?usp=sharing"
     csv_url = url.replace('/edit?usp=sharing', '/export?format=csv')
@@ -25,22 +26,45 @@ def play_audio(text):
         tts.write_to_fp(fp)
         st.audio(fp)
     except:
-        st.error("發音失敗")
+        st.error("發音產生失敗，請檢查網路連線")
 
 # --- 主介面 ---
 st.title("🇰🇷 宜真的韓語基地")
 
-# 每日金句 (固定一組)
-st.info("✨ 今日動力：오늘도 화이팅! (今天也要加油！)")
+# --- 每日一句區塊 (補回發音按鈕) ---
+quotes = [
+    {"kr": "오늘도 화이팅! 할 수 있어요.", "cn": "今天也要加油！你可以的。"},
+    {"kr": "어제보다 더 나은 오늘", "cn": "比昨天更好的今天"},
+    {"kr": "꿈을 향해 한 걸음씩.", "cn": "朝著夢想一步步前進。"}
+]
+
+if 'daily_q' not in st.session_state:
+    st.session_state.daily_q = random.choice(quotes)
+
+q = st.session_state.daily_q
+
+with st.container():
+    st.info(f"✨ **今日動力**\n### {q['kr']}\n{q['cn']}")
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🔊 播放"):
+            play_audio(q['kr'])
+    with col2:
+        if st.button("換一句"):
+            st.session_state.daily_q = random.choice(quotes)
+            st.rerun()
+
+st.divider()
 
 df = load_data()
 
 if not df.empty:
-    # 側邊欄
-    st.sidebar.title("🎯 篩選章節")
-    chapters = sorted(df['chapter'].astype(str).unique().tolist())
-    sel_ch = st.sidebar.multiselect("選擇章節", chapters)
-    st.sidebar.markdown("[🔗 打開試算表](https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit)")
+    # --- 章節選擇器 ---
+    st.subheader("🎯 篩選章節")
+    all_chapters = sorted(df['chapter'].astype(str).unique().tolist())
+    sel_ch = st.multiselect("選擇章節：", all_chapters)
+    
+    st.divider()
 
     # 分頁
     tabs = st.tabs(["📖 單字", "📝 文法", "📢 發音"])
@@ -49,41 +73,24 @@ if not df.empty:
     for i, tab in enumerate(tabs):
         with tab:
             cat = categories[i]
-            # 篩選資料
             tmp = df[df['type'] == cat]
             if sel_ch:
                 tmp = tmp[tmp['chapter'].astype(str).isin(sel_ch)]
             
             if tmp.empty:
-                st.write("目前無資料")
+                st.write(f"目前『{cat}』在所選章節中無資料")
             else:
-                # 題目邏輯
                 key = f"quiz_{cat}"
                 if key not in st.session_state:
                     st.session_state[key] = tmp.sample(1).iloc[0]
                 
                 item = st.session_state[key]
-                st.caption(f"章節：{item['chapter']}")
+                st.caption(f"📍 來源：{item['chapter']}")
                 st.subheader(f"請回答：{item['cn']}")
 
                 mode = st.radio("模式", ["快速", "打字"], key=f"m_{cat}")
                 
                 if mode == "快速":
-                    if st.button("看答案", key=f"ans_{cat}"):
-                        st.success(item['kr'])
-                        play_audio(item['kr'])
-                else:
-                    user_in = st.text_input("輸入韓文", key=f"in_{cat}")
-                    if st.button("檢查", key=f"btn_{cat}"):
-                        if user_in.strip() == str(item['kr']).strip():
-                            st.balloons()
-                            st.success("正確！")
-                        else:
-                            st.error(f"錯誤，答案是：{item['kr']}")
-                        play_audio(item['kr'])
-
-                if st.button("下一題", key=f"next_{cat}"):
-                    del st.session_state[key]
-                    st.rerun()
-else:
-    st.warning("試算表讀取不到資料，請檢查標題列是否為 chapter, kr, cn, type, note")
+                    if st.button("看答案並聽發音", key=f"ans_{cat}"):
+                        st.success(f"答案是：{item['kr']}")
+                        play_audio(item
