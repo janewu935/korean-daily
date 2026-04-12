@@ -1,95 +1,71 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import random
 from datetime import date
 from gtts import gTTS
 import io
+import pandas as pd
 
 st.set_page_config(page_title="宜真韓語全功能站", page_icon="🇰🇷")
 
-# --- 1. 每日一句資料庫 ---
-quotes = [
-    {"kr": "오늘도 화이팅! 할 수 있어요.", "cn": "今天也要加油！你可以的。"},
-    {"kr": "어제보다 더 나은 오늘", "cn": "比昨天更好的今天"},
-    {"kr": "포기하지 마세요, 꿈은 이루어질 거예요.", "cn": "請不要放棄，夢想會實現的。"}
-]
+# --- 1. 連接 Google Sheets ---
+# 請確保你的 Secrets 已經設定好，或者直接把網址寫死在下面
+url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit#gid=0"
 
-# --- 2. 語音播放函數 ---
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    # 這裡就是讀取資料的地方
+    df = conn.read(spreadsheet=url, usecols=[0, 1, 2], ttl="0") 
+    df = df.dropna(how="all")
+    st.sidebar.success("✅ 已連結 Google Sheets")
+    st.sidebar.write(f"目前單字數：{len(df)}")
+except Exception as e:
+    st.sidebar.error(f"❌ 連線失敗：{e}")
+    df = pd.DataFrame(columns=["date", "kr", "cn"])
+
+# --- 2. 語音功能 ---
 def play_audio(text):
     tts = gTTS(text=text, lang='ko')
     fp = io.BytesIO()
     tts.write_to_fp(fp)
     st.audio(fp)
 
-# --- 介面設計 ---
+# --- 3. 介面與功能 ---
 st.title("🇰🇷 宜真的韓語學習基地")
 
-# 區塊一：每日一句 (保留原功能)
-with st.expander("✨ 今日動力：每日一句", expanded=True):
-    if 'daily_q' not in st.session_state:
-        st.session_state.daily_q = random.choice(quotes)
+# 區塊一：新增單字
+with st.expander("➕ 手機輸入新單字", expanded=True):
+    with st.form("add_form", clear_on_submit=True):
+        new_kr = st.text_input("輸入韓文單字")
+        new_cn = st.text_input("輸入中文意思")
+        if st.form_submit_button("永久存入試算表"):
+            if new_kr and new_cn:
+                # 建立新資料列
+                new_data = pd.DataFrame([{"date": str(date.today()), "kr": new_kr, "cn": new_cn}])
+                # 合併舊資料與新資料
+                updated_df = pd.concat([df, new_data], ignore_index=True)
+                # 寫回 Google Sheets
+                conn.update(spreadsheet=url, data=updated_df)
+                st.success(f"✅ 成功寫入：{new_kr}")
+                st.cache_data.clear() # 清除快取，強制下次讀取最新資料
+                st.rerun()
+
+# 區塊二：複習與測驗
+st.divider()
+if not df.empty and len(df) > 0:
+    test_item = df.sample(1).iloc[0]
+    st.subheader("🧠 隨機複習")
+    st.info(f"這是什麼意思？ **{test_item['kr']}**")
     
-    q = st.session_state.daily_q
-    st.info(f"### {q['kr']}\n{q['cn']}")
-    if st.button("🔊 聽句子發音"):
-        play_audio(q['kr'])
-    if st.button("換一句話"):
-        st.session_state.daily_q = random.choice(quotes)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔊 聽發音"):
+            play_audio(test_item['kr'])
+    with col2:
+        if st.button("👀 看答案"):
+            st.write(f"💡 **{test_item['cn']}**")
+    
+    if st.button("換下一個"):
         st.rerun()
-
-st.divider()
-
-# 區塊二：互動單字本
-if 'my_vocab' not in st.session_state:
-    st.session_state.my_vocab = []
-
-tab1, tab2 = st.tabs(["➕ 新增單字", "🧠 複習模式"])
-
-with tab1:
-    st.subheader("手機隨手記")
-    with st.form("vocab_form", clear_on_submit=True):
-        kr_word = st.text_input("輸入韓文單字")
-        cn_mean = st.text_input("輸入中文意思")
-        if st.form_submit_button("存入單字本"):
-            if kr_word and cn_mean:
-                st.session_state.my_vocab.append({"kr": kr_word, "cn": cn_mean})
-                st.success(f"已記錄：{kr_word}")
-
-    st.write("目前單字量：", len(st.session_state.my_vocab))
-    if st.session_state.my_vocab:
-        st.write(st.session_state.my_vocab[-5:]) # 顯示最後五個
-
-with tab2:
-    st.subheader("測驗與複習")
-    if not st.session_state.my_vocab:
-        st.write("單字本空空的，先去新增吧！")
-    else:
-        # 隨機抽題
-        if 'test_idx' not in st.session_state:
-            st.session_state.test_idx = 0
-            
-        current = st.session_state.my_vocab[st.session_state.test_idx]
-        
-        mode = st.radio("測驗方式", ["翻譯挑戰", "Go/No Go"])
-        
-        if mode == "翻譯挑戰":
-            st.warning(f"請翻譯：{current['cn']}")
-            ans = st.text_input("輸入韓文答案")
-            if st.button("檢查"):
-                if ans.strip() == current['kr'].strip():
-                    st.success("✅ 正確！")
-                    play_audio(current['kr'])
-                else:
-                    st.error(f"❌ 錯誤！答案是：{current['kr']}")
-        else:
-            st.info(f"這個字記得嗎？ {current['kr']}")
-            if st.button("🔊 聽發音"):
-                play_audio(current['kr'])
-            if st.button("顯示中文答案"):
-                st.write(f"解釋：{current['cn']}")
-                
-        if st.button("換下一個"):
-            st.session_state.test_idx = random.randint(0, len(st.session_state.my_vocab)-1)
-            st.rerun()
-
-st.divider()
-st.caption("目標：10月 TOPIK II 3級合格！加油！")
+else:
+    st.write("目前試算表是空的，請先輸入單字！")
