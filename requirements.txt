@@ -1,3 +1,4 @@
 streamlit
 gTTS
-st-gsheets-connection
+gspread
+gspread-dataframe
