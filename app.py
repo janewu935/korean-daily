@@ -8,64 +8,81 @@ import pandas as pd
 
 st.set_page_config(page_title="宜真韓語全功能站", page_icon="🇰🇷")
 
-# --- 1. 連接 Google Sheets ---
-# 請確保你的 Secrets 已經設定好，或者直接把網址寫死在下面
-url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit#gid=0"
+# --- 1. 連接設定 ---
+# 使用你提供的公開分享網址
+url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit?usp=sharing"
+
+def get_data():
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    # ttl=0 確保每次都抓最新單字
+    return conn, conn.read(spreadsheet=url, ttl=0).dropna(how="all")
 
 try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    # 這裡就是讀取資料的地方
-    df = conn.read(spreadsheet=url, usecols=[0, 1, 2], ttl="0") 
-    df = df.dropna(how="all")
-    st.sidebar.success("✅ 已連結 Google Sheets")
-    st.sidebar.write(f"目前單字數：{len(df)}")
+    conn, df = get_data()
+    st.sidebar.success(f"✅ 連線成功！目前有 {len(df)} 個單字")
 except Exception as e:
-    st.sidebar.error(f"❌ 連線失敗：{e}")
+    st.sidebar.error("❌ 連線異常")
+    st.sidebar.info("請檢查試算表是否已設為「編輯者」權限")
     df = pd.DataFrame(columns=["date", "kr", "cn"])
 
 # --- 2. 語音功能 ---
 def play_audio(text):
-    tts = gTTS(text=text, lang='ko')
-    fp = io.BytesIO()
-    tts.write_to_fp(fp)
-    st.audio(fp)
+    try:
+        tts = gTTS(text=text, lang='ko')
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        st.audio(fp)
+    except:
+        st.warning("暫時無法產生語音")
 
-# --- 3. 介面與功能 ---
-st.title("🇰🇷 宜真的韓語學習基地")
+# --- 3. 介面設計 ---
+st.title("🇰🇷 宜真的韓語基地")
 
-# 區塊一：新增單字
-with st.expander("➕ 手機輸入新單字", expanded=True):
-    with st.form("add_form", clear_on_submit=True):
-        new_kr = st.text_input("輸入韓文單字")
-        new_cn = st.text_input("輸入中文意思")
-        if st.form_submit_button("永久存入試算表"):
+tab1, tab2 = st.tabs(["📝 新增單字", "📖 複習模式"])
+
+with tab1:
+    st.subheader("手機隨手記")
+    with st.form("my_form", clear_on_submit=True):
+        new_kr = st.text_input("輸入韓文 (KR)")
+        new_cn = st.text_input("輸入中文 (CN)")
+        submit = st.form_submit_button("永久存入試算表")
+        
+        if submit:
             if new_kr and new_cn:
-                # 建立新資料列
-                new_data = pd.DataFrame([{"date": str(date.today()), "kr": new_kr, "cn": new_cn}])
-                # 合併舊資料與新資料
-                updated_df = pd.concat([df, new_data], ignore_index=True)
-                # 寫回 Google Sheets
-                conn.update(spreadsheet=url, data=updated_df)
-                st.success(f"✅ 成功寫入：{new_kr}")
-                st.cache_data.clear() # 清除快取，強制下次讀取最新資料
-                st.rerun()
+                # 準備新資料
+                new_row = pd.DataFrame([{"date": str(date.today()), "kr": new_kr.strip(), "cn": new_cn.strip()}])
+                # 合併舊資料
+                updated_df = pd.concat([df, new_row], ignore_index=True)
+                
+                try:
+                    # 執行寫入
+                    conn.update(spreadsheet=url, data=updated_df)
+                    st.success(f"✅ 成功存入：{new_kr}")
+                    # 強制刷新
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error("寫入失敗！")
+                    st.info("請確認 Google 試算表的共用權限已設為「編輯者」。")
+            else:
+                st.warning("韓文和中文都要填喔！")
 
-# 區塊二：複習與測驗
-st.divider()
-if not df.empty and len(df) > 0:
-    test_item = df.sample(1).iloc[0]
-    st.subheader("🧠 隨機複習")
-    st.info(f"這是什麼意思？ **{test_item['kr']}**")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔊 聽發音"):
-            play_audio(test_item['kr'])
-    with col2:
-        if st.button("👀 看答案"):
-            st.write(f"💡 **{test_item['cn']}**")
-    
-    if st.button("換下一個"):
-        st.rerun()
-else:
-    st.write("目前試算表是空的，請先輸入單字！")
+with tab2:
+    if not df.empty and len(df) > 0:
+        # 如果第一列是標題，隨機挑選時排除
+        test_df = df[df['kr'] != 'kr'] 
+        if not test_df.empty:
+            item = test_df.sample(1).iloc[0]
+            st.subheader("測驗挑戰")
+            st.info(f"這個怎麼說？ **{item['cn']}**")
+            
+            if st.button("看答案並聽發音"):
+                st.success(f"答案是：{item['kr']}")
+                play_audio(item['kr'])
+            
+            if st.button("下一個"):
+                st.rerun()
+        else:
+            st.write("單字本還沒有有效內容。")
+    else:
+        st.write("目前單字本是空的，快去新增吧！")
