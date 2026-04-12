@@ -1,4 +1,3 @@
 streamlit
-gTTS
-gspread
-gspread-dataframe
+pandas
+gtts
