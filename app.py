@@ -11,13 +11,13 @@ st.set_page_config(page_title="韓語筆記", page_icon="💙")
 # --- CSS 樣式 ---
 st.markdown("""
     <style>
-    .stApp { background-color: #F8FBFF; }
+    .stApp { background-color: #007FFF; }
     .main-title { color: #007FFF !important; font-size: 38px; font-weight: 800; text-align: center; }
     .report-box { background-color: #FFFFFF; padding: 25px; border-radius: 15px; border: 2px solid #007FFF; margin: 20px 0; }
     .stButton>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; font-weight: bold; width: 100%; border: none; }
     .stop-button>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; }
     .flashcard { background-color: #FFFFFF; padding: 30px; border-radius: 15px; border: 1px solid #E6F3FF; text-align: center; margin-bottom: 10px; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
-    p, span, label { color: #1A1A1A !important; font-weight: 600; }
+    p, span, label { color: #007FFF !important; font-weight: 600; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -162,4 +162,4 @@ if st.session_state.show_report:
     pass
 
 st.divider()
-st.info("加油！")
+
