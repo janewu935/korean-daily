@@ -138,7 +138,7 @@ if not df.empty:
                 st.markdown(f"""<div class="flashcard"><h3>{item['cn']}</h3><small>單元：{item['chapter']}</small></div>""", unsafe_allow_html=True)
                 
                 if "閃卡" in study_mode:
-                    if st.button("👁️ 顯示答案", key=f"s_{target_cat}"):
+                    if st.button("顯示答案", key=f"s_{target_cat}"):
                         st.info(f"🇰🇷：**{item['kr']}**"); play_audio(item['kr'])
                 else:
                     u_in = st.text_input("輸入韓文回答", key=f"ex_{target_cat}_{len(p)}")
@@ -151,7 +151,7 @@ if not df.empty:
                             st.session_state.wrong_items.append(item)
                         play_audio(item['kr'])
 
-                if st.button("下一題 ➡️", key=f"n_{target_cat}"):
+                if st.button("下一題", key=f"n_{target_cat}"):
                     p.pop(0); st.rerun()
             else:
                 st.write("✅ 該分類複習完畢。")
