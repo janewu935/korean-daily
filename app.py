@@ -28,8 +28,8 @@ if 'ex_total' not in st.session_state: st.session_state.ex_total = 0
 if 'ex_correct' not in st.session_state: st.session_state.ex_correct = 0
 if 'show_report' not in st.session_state: st.session_state.show_report = False
 if 'wrong_items' not in st.session_state: st.session_state.wrong_items = []
-# 獨立分類的池子
 if 'pools' not in st.session_state: st.session_state.pools = {"單字": [], "文法": [], "發音": []}
+if 'last_sel_ch' not in st.session_state: st.session_state.last_sel_ch = []
 
 # --- 2. 輔助功能 ---
 def get_cheer_message():
@@ -55,7 +55,6 @@ def load_data():
         return df.dropna(subset=['kr', 'cn'])
     except: return pd.DataFrame()
 
-# --- 3. 每日翻譯考試引擎 ---
 def generate_daily_quiz():
     subjects = [{"cn": "我", "kr": "저는"}, {"cn": "老師", "kr": "선생님은"}, {"cn": "朋友", "kr": "친구는"}, {"cn": "妹妹", "kr": "여동생은"}]
     actions = [
@@ -76,26 +75,19 @@ def generate_daily_quiz():
 # --- 主介面 ---
 st.markdown('<p class="main-title">💙 韓語全能學習系統 💙</p>', unsafe_allow_html=True)
 
-# 結算報告
 if st.session_state.show_report:
     acc = (st.session_state.ex_correct / st.session_state.ex_total * 100) if st.session_state.ex_total > 0 else 0
     st.markdown(f"""<div class="report-box"><h3 style='text-align: center; color: #007FFF;'>📊 Excel 複習結算</h3><p style='text-align: center; font-size: 20px;'>準確率：{acc:.1f}% ({st.session_state.ex_correct}/{st.session_state.ex_total})</p></div>""", unsafe_allow_html=True)
-    
     if st.session_state.wrong_items:
         st.subheader("❌ 寫錯的內容回顧：")
         for w in st.session_state.wrong_items:
             st.markdown(f"""<div class="wrong-list">📍 [{w['type']}] {w['cn']} → <b>{w['kr']}</b> ({w['chapter']})</div>""", unsafe_allow_html=True)
         if st.button("🔥 針對錯題重新複習"):
-            # 將錯題按類別重新填入 pools
             for cat in st.session_state.pools:
                 st.session_state.pools[cat] = [x for x in st.session_state.wrong_items if x['type'] == cat]
-            st.session_state.wrong_items = []
-            st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.show_report = False; st.rerun()
-    else: st.success("🎉 太完美了！良率 100%！")
-
-    if st.button("🔄 開啟全新一輪 (清空所有分類)"):
-        st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.wrong_items = []
-        st.session_state.pools = {"單字": [], "文法": [], "發音": []}; st.session_state.show_report = False; st.rerun()
+            st.session_state.wrong_items = []; st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.show_report = False; st.rerun()
+    if st.button("🔄 開啟全新一輪 (清空池子)"):
+        st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.wrong_items = []; st.session_state.pools = {"單字": [], "文法": [], "發音": []}; st.session_state.show_report = False; st.rerun()
     st.stop()
 
 # --- 4. 每日翻譯挑戰 ---
@@ -118,14 +110,21 @@ with c_dq2:
 
 st.divider()
 
-# --- 5. Excel 複習區 (分類不重複池) ---
+# --- 5. Excel 複習區 ---
 st.subheader("🎯 Excel 題庫分類複習")
 df = load_data()
 if not df.empty:
     all_ch = sorted(df['chapter'].astype(str).unique().tolist())
-    sel_ch = st.multiselect("篩選章節：", all_ch, key="chapter_sel")
-    study_mode = st.radio("模式選擇：", ["📖 閃卡 (複習)", "✍️ 考試 (練習)"], horizontal=True)
+    
+    # --- 💡 關鍵：預設全選所有章節 ---
+    sel_ch = st.multiselect("篩選章節：", all_ch, default=all_ch, key="chapter_sel")
+    
+    # 檢查篩選章節是否有變動，若變動則清空池子重新初始化
+    if sel_ch != st.session_state.last_sel_ch:
+        st.session_state.pools = {"單字": [], "文法": [], "發音": []}
+        st.session_state.last_sel_ch = sel_ch
 
+    study_mode = st.radio("模式：", ["📖 閃卡 (複習)", "✍️ 考試 (練習)"], horizontal=True)
     tabs = st.tabs(["📖 單字", "📝 文法", "📢 發音"])
     cat_list = ["單字", "文法", "發音"]
 
@@ -133,20 +132,20 @@ if not df.empty:
         with tab:
             target_cat = cat_list[i]
             
-            # 如果該分類的池子是空的，且沒有在報告模式，就初始化它
+            # 初始化該單元、該分類的專屬池子
             if not st.session_state.pools[target_cat]:
                 curr_df = df[df['type'] == target_cat]
-                if sel_ch: curr_df = curr_df[curr_df['chapter'].astype(str).isin(sel_ch)]
+                if sel_ch:
+                    curr_df = curr_df[curr_df['chapter'].astype(str).isin(sel_ch)]
                 if not curr_df.empty:
                     st.session_state.pools[target_cat] = curr_df.to_dict('records')
                     random.shuffle(st.session_state.pools[target_cat])
 
-            # 開始顯示該分類內容
             current_pool = st.session_state.pools[target_cat]
             if current_pool:
-                st.write(f"📝 該分類剩餘：{len(current_pool)} 題")
+                st.write(f"📝 目前選取單元剩餘：{len(current_pool)} 題")
                 item = current_pool[0]
-                st.markdown(f"""<div class="flashcard"><h3>{item['cn']}</h3><small>{item['chapter']}</small></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class="flashcard"><h3>{item['cn']}</h3><small>單元：{item['chapter']}</small></div>""", unsafe_allow_html=True)
                 
                 if "閃卡" in study_mode:
                     if st.button("👁️ 顯示答案", key=f"show_{target_cat}"):
@@ -156,8 +155,7 @@ if not df.empty:
                     if st.button("提交驗證", key=f"btn_{target_cat}"):
                         is_ok = clean_text(u_in_ex) == clean_text(str(item['kr']))
                         st.session_state.ex_total += 1
-                        if is_ok:
-                            st.success("⭕ 正確！"); st.session_state.ex_correct += 1
+                        if is_ok: st.success("⭕ 正確！"); st.session_state.ex_correct += 1
                         else:
                             st.error(f"❌ 錯誤！答案：{item['kr']}")
                             if item not in st.session_state.wrong_items: st.session_state.wrong_items.append(item)
@@ -167,7 +165,7 @@ if not df.empty:
                     st.session_state.pools[target_cat].pop(0)
                     st.rerun()
             else:
-                st.write(f"✅ {target_cat} 分類已全部複習完畢，或該章節無此分類資料。")
+                st.write(f"✅ 該分類在所選單元中已複習完畢。")
 
     st.markdown('<div class="stop-button">', unsafe_allow_html=True)
     if st.button("⏹️ 結束測驗並產出總報告"):
