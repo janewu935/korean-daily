@@ -28,7 +28,8 @@ if 'ex_total' not in st.session_state: st.session_state.ex_total = 0
 if 'ex_correct' not in st.session_state: st.session_state.ex_correct = 0
 if 'show_report' not in st.session_state: st.session_state.show_report = False
 if 'wrong_items' not in st.session_state: st.session_state.wrong_items = []
-if 'pool' not in st.session_state: st.session_state.pool = []
+# 獨立分類的池子
+if 'pools' not in st.session_state: st.session_state.pools = {"單字": [], "文法": [], "發音": []}
 
 # --- 2. 輔助功能 ---
 def get_cheer_message():
@@ -54,9 +55,9 @@ def load_data():
         return df.dropna(subset=['kr', 'cn'])
     except: return pd.DataFrame()
 
-# --- 3. 每日文法挑戰引擎 ---
+# --- 3. 每日翻譯考試引擎 ---
 def generate_daily_quiz():
-    subjects = [{"cn": "我", "kr": "저는"}, {"cn": "老師", "kr": "선생님은"}, {"cn": "朋友", "kr": "친구는"}, {"cn": "妹妹", "kr": "여動生은"}]
+    subjects = [{"cn": "我", "kr": "저는"}, {"cn": "老師", "kr": "선생님은"}, {"cn": "朋友", "kr": "친구는"}, {"cn": "妹妹", "kr": "여동생은"}]
     actions = [
         {"cn": "吃麵包", "pol": "빵을 먹어요", "past": "빵을 먹었어요", "want": "빵을 먹고 싶어 해요", "neg": "빵을 먹지 않아요", "req": "빵을 먹어 주세요", "can": "빵을 먹을 수 있어요"},
         {"cn": "喝咖啡", "pol": "커피를 마셔요", "past": "커피를 마셨어요", "want": "커피를 마시고 싶어 해요", "neg": "커피를 마시지 않아요", "req": "커피를 마셔 주세요", "can": "커피를 마실 수 있어요"},
@@ -75,33 +76,35 @@ def generate_daily_quiz():
 # --- 主介面 ---
 st.markdown('<p class="main-title">💙 韓語全能學習系統 💙</p>', unsafe_allow_html=True)
 
-# 顯示結算報告
+# 結算報告
 if st.session_state.show_report:
     acc = (st.session_state.ex_correct / st.session_state.ex_total * 100) if st.session_state.ex_total > 0 else 0
     st.markdown(f"""<div class="report-box"><h3 style='text-align: center; color: #007FFF;'>📊 Excel 複習結算</h3><p style='text-align: center; font-size: 20px;'>準確率：{acc:.1f}% ({st.session_state.ex_correct}/{st.session_state.ex_total})</p></div>""", unsafe_allow_html=True)
     
     if st.session_state.wrong_items:
-        st.subheader("❌ 這次寫錯的單字：")
+        st.subheader("❌ 寫錯的內容回顧：")
         for w in st.session_state.wrong_items:
-            st.markdown(f"""<div class="wrong-list">📍 {w['cn']} → <b>{w['kr']}</b> ({w['chapter']})</div>""", unsafe_allow_html=True)
-        if st.button("🔥 針對這些錯題重新複習"):
-            st.session_state.pool = st.session_state.wrong_items.copy(); st.session_state.wrong_items = []
+            st.markdown(f"""<div class="wrong-list">📍 [{w['type']}] {w['cn']} → <b>{w['kr']}</b> ({w['chapter']})</div>""", unsafe_allow_html=True)
+        if st.button("🔥 針對錯題重新複習"):
+            # 將錯題按類別重新填入 pools
+            for cat in st.session_state.pools:
+                st.session_state.pools[cat] = [x for x in st.session_state.wrong_items if x['type'] == cat]
+            st.session_state.wrong_items = []
             st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.show_report = False; st.rerun()
     else: st.success("🎉 太完美了！良率 100%！")
 
-    if st.button("🔄 開啟全新一輪複習"):
+    if st.button("🔄 開啟全新一輪 (清空所有分類)"):
         st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.wrong_items = []
-        st.session_state.pool = []; st.session_state.show_report = False; st.rerun()
+        st.session_state.pools = {"單字": [], "文法": [], "發音": []}; st.session_state.show_report = False; st.rerun()
     st.stop()
 
-# --- 4. 每日文法挑戰 (保留原始功能) ---
+# --- 4. 每日翻譯挑戰 ---
 st.subheader("✍️ 每日一句翻譯考試")
 if 'dq' not in st.session_state: st.session_state.dq = generate_daily_quiz()
 if 'dq_id' not in st.session_state: st.session_state.dq_id = 0
 dq = st.session_state.dq
 st.info(f"💡 **題目：** 「 {dq['cn']} 」")
-u_in_dq = st.text_input("在此輸入翻譯答案：", key=f"dq_in_{st.session_state.dq_id}")
-
+u_in_dq = st.text_input("輸入翻譯：", key=f"dq_in_{st.session_state.dq_id}")
 c_dq1, c_dq2 = st.columns(2)
 with c_dq1:
     if st.button("驗證翻譯"):
@@ -110,56 +113,64 @@ with c_dq1:
             if is_ok: st.balloons(); st.success(f"⭕ 正確：{dq['kr']}")
             else: st.error(f"❌ 錯誤！正確答案：{dq['kr']}"); play_audio(dq['kr'])
 with c_dq2:
-    if st.button("換一題翻譯"):
+    if st.button("換下一題"):
         st.session_state.dq = generate_daily_quiz(); st.session_state.dq_id += 1; st.rerun()
 
 st.divider()
 
-# --- 5. Excel 複習區 (不重複池邏輯) ---
-st.subheader("🎯 Excel 題庫：閃卡與考試")
+# --- 5. Excel 複習區 (分類不重複池) ---
+st.subheader("🎯 Excel 題庫分類複習")
 df = load_data()
 if not df.empty:
-    col_ch, col_mode = st.columns([2, 1])
-    with col_ch:
-        all_ch = sorted(df['chapter'].astype(str).unique().tolist())
-        sel_ch = st.multiselect("章節篩選：", all_ch)
-    with col_mode:
-        study_mode = st.radio("模式：", ["📖 閃卡", "✍️ 考試"], horizontal=True)
+    all_ch = sorted(df['chapter'].astype(str).unique().tolist())
+    sel_ch = st.multiselect("篩選章節：", all_ch, key="chapter_sel")
+    study_mode = st.radio("模式選擇：", ["📖 閃卡 (複習)", "✍️ 考試 (練習)"], horizontal=True)
 
-    # 初始化不重複池子
-    if not st.session_state.pool:
-        curr_df = df.copy()
-        if sel_ch: curr_df = curr_df[curr_df['chapter'].astype(str).isin(sel_ch)]
-        if not curr_df.empty:
-            st.session_state.pool = curr_df.to_dict('records')
-            random.shuffle(st.session_state.pool)
+    tabs = st.tabs(["📖 單字", "📝 文法", "📢 發音"])
+    cat_list = ["單字", "文法", "發音"]
 
-    if st.session_state.pool:
-        st.write(f"📝 剩餘進度：{len(st.session_state.pool)} 題")
-        item = st.session_state.pool[0]
-        st.markdown(f"""<div class="flashcard"><h3>{item['cn']}</h3><small>{item['type']} | {item['chapter']}</small></div>""", unsafe_allow_html=True)
-        
-        if "閃卡" in study_mode:
-            if st.button("👁️ 顯示答案", key="ex_show"):
-                st.info(f"🇰🇷：**{item['kr']}**"); play_audio(item['kr'])
-        else:
-            u_in_ex = st.text_input("輸入韓文回答", key=f"ex_in_{len(st.session_state.pool)}")
-            if st.button("驗證內容", key="ex_btn"):
-                is_ok = clean_text(u_in_ex) == clean_text(str(item['kr']))
-                st.session_state.ex_total += 1
-                if is_ok: st.success("⭕ 正確！"); st.session_state.ex_correct += 1
+    for i, tab in enumerate(tabs):
+        with tab:
+            target_cat = cat_list[i]
+            
+            # 如果該分類的池子是空的，且沒有在報告模式，就初始化它
+            if not st.session_state.pools[target_cat]:
+                curr_df = df[df['type'] == target_cat]
+                if sel_ch: curr_df = curr_df[curr_df['chapter'].astype(str).isin(sel_ch)]
+                if not curr_df.empty:
+                    st.session_state.pools[target_cat] = curr_df.to_dict('records')
+                    random.shuffle(st.session_state.pools[target_cat])
+
+            # 開始顯示該分類內容
+            current_pool = st.session_state.pools[target_cat]
+            if current_pool:
+                st.write(f"📝 該分類剩餘：{len(current_pool)} 題")
+                item = current_pool[0]
+                st.markdown(f"""<div class="flashcard"><h3>{item['cn']}</h3><small>{item['chapter']}</small></div>""", unsafe_allow_html=True)
+                
+                if "閃卡" in study_mode:
+                    if st.button("👁️ 顯示答案", key=f"show_{target_cat}"):
+                        st.info(f"🇰🇷：**{item['kr']}**"); play_audio(item['kr'])
                 else:
-                    st.error(f"❌ 錯誤！正確答案：{item['kr']}")
-                    if item not in st.session_state.wrong_items: st.session_state.wrong_items.append(item)
-                play_audio(item['kr'])
+                    u_in_ex = st.text_input("輸入韓文回答", key=f"in_{target_cat}_{len(current_pool)}")
+                    if st.button("提交驗證", key=f"btn_{target_cat}"):
+                        is_ok = clean_text(u_in_ex) == clean_text(str(item['kr']))
+                        st.session_state.ex_total += 1
+                        if is_ok:
+                            st.success("⭕ 正確！"); st.session_state.ex_correct += 1
+                        else:
+                            st.error(f"❌ 錯誤！答案：{item['kr']}")
+                            if item not in st.session_state.wrong_items: st.session_state.wrong_items.append(item)
+                        play_audio(item['kr'])
 
-        if st.button("下一題 ➡️", key="ex_next"):
-            st.session_state.pool.pop(0)
-            if not st.session_state.pool: st.session_state.show_report = True
-            st.rerun()
-    
+                if st.button("下一題 ➡️", key=f"next_{target_cat}"):
+                    st.session_state.pools[target_cat].pop(0)
+                    st.rerun()
+            else:
+                st.write(f"✅ {target_cat} 分類已全部複習完畢，或該章節無此分類資料。")
+
     st.markdown('<div class="stop-button">', unsafe_allow_html=True)
-    if st.button("⏹️ 結束 Excel 複習並看報告"):
+    if st.button("⏹️ 結束測驗並產出總報告"):
         st.session_state.show_report = True; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
