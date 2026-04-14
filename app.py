@@ -51,7 +51,7 @@ def load_data():
 
 # --- 3. 每日一句翻譯挑戰 (置頂) ---
 st.markdown('<p class="main-title">💙 韓語單字 💙</p>', unsafe_allow_html=True)
-st.subheader("✍️ 每日一句翻譯考試")
+st.subheader("每日一句翻譯考試")
 
 # 簡單的內建題庫邏輯
 if 'dq' not in st.session_state:
