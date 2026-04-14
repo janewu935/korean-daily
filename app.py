@@ -11,7 +11,7 @@ st.set_page_config(page_title="韓語筆記", page_icon="💙")
 # --- CSS 樣式 ---
 st.markdown("""
     <style>
-    .stApp { background-color: F8FBFF; }
+    .stApp { background-color: #F8FBFF; }
     .main-title { color: #007FFF !important; font-size: 38px; font-weight: 800; text-align: center; }
     .report-box { background-color: #FFFFFF; padding: 25px; border-radius: 15px; border: 2px solid #007FFF; margin: 20px 0; }
     .stButton>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; font-weight: bold; width: 100%; border: none; }
