@@ -8,7 +8,7 @@ from datetime import date
 
 st.set_page_config(page_title="韓語筆記", page_icon="💙")
 
-# --- CSS 樣式 (精準還原妳的設計) ---
+# --- CSS 樣式 (依照設計圖優化) ---
 st.markdown("""
     <style>
     .stApp { background-color: #F8FBFF; }
@@ -21,6 +21,7 @@ st.markdown("""
         text-align: center; 
         margin-bottom: 20px;
         background-color: rgba(0, 127, 255, 0.05);
+        font-weight: bold;
     }
     .flashcard-main { 
         background-color: #FFFFFF; 
@@ -29,12 +30,15 @@ st.markdown("""
         border: 1px solid #E6F3FF; 
         text-align: center; 
         box-shadow: 2px 2px 15px rgba(0,0,0,0.05);
-        position: relative;
     }
-    .kr-hint {
-        color: #666666;
-        font-size: 1.2em;
-        margin-top: 10px;
+    .formula-hint {
+        background-color: #F1F1F1;
+        color: #555555;
+        padding: 5px 15px;
+        border-radius: 20px;
+        display: inline-block;
+        margin-top: 15px;
+        font-size: 0.9em;
     }
     .stButton>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; font-weight: bold; width: 100%; border: none; }
     p, span, label { color: #1A1A1A !important; font-weight: 600; }
@@ -47,7 +51,6 @@ def load_data():
     url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/edit?usp=sharing"
     csv_url = url.replace('/edit?usp=sharing', '/export?format=csv&gid=0')
     try:
-        # 讀取 Excel 並保留所有欄位
         df = pd.read_csv(csv_url).fillna("")
         df.columns = [c.strip().lower() for c in df.columns]
         return df
@@ -61,10 +64,9 @@ def play_audio(text):
         fp = io.BytesIO(); tts.write_to_fp(fp); st.audio(fp)
     except: pass
 
-# --- 2. 初始化狀態 ---
+# --- 2. 狀態初始化 ---
 if 'ex_total' not in st.session_state: st.session_state.ex_total = 0
 if 'ex_correct' not in st.session_state: st.session_state.ex_correct = 0
-if 'show_report' not in st.session_state: st.session_state.show_report = False
 if 'wrong_items' not in st.session_state: st.session_state.wrong_items = []
 if 'pools' not in st.session_state: st.session_state.pools = {"單字": [], "文法": [], "發音": []}
 if 'sel_ch' not in st.session_state: st.session_state.sel_ch = ["ALL 全部單元"]
@@ -72,21 +74,21 @@ if 'sel_ch' not in st.session_state: st.session_state.sel_ch = ["ALL 全部單�
 # --- 3. 介面呈現 ---
 st.markdown('<p class="main-title">💙 韓語全能學習系統 💙</p>', unsafe_allow_html=True)
 
-# 每日翻譯考試 (置頂)
+# 每日翻譯挑戰
 st.subheader("✍️ 每日一句翻譯考試")
 if 'dq' not in st.session_state:
     st.session_state.dq = {"cn": "我想喝咖啡。", "kr": "저는 커피를 마시고 싶어요"}
 dq = st.session_state.dq
 st.info(f"💡 **題目：** 「 {dq['cn']} 」")
-u_in_dq = st.text_input("在此輸入翻譯挑戰：", key="dq_input")
-if st.button("驗證翻譯挑戰"):
+u_in_dq = st.text_input("輸入翻譯答案：", key="dq_input")
+if st.button("驗證翻譯"):
     if u_in_dq and clean_text(u_in_dq) == clean_text(dq['kr']): st.success("⭕ 正確！"); st.balloons()
     else: st.error(f"❌ 錯誤！正確答案：{dq['kr']}"); play_audio(dq['kr'])
 
 st.divider()
 
 # --- 4. Excel 複習區 ---
-st.subheader("🎯 Excel 題庫複習區")
+st.subheader("🎯 Excel 題庫：文法造句模式")
 df = load_data()
 
 if not df.empty:
@@ -101,7 +103,7 @@ if not df.empty:
         else: st.session_state.sel_ch = new
         st.session_state.pools = {"單字": [], "文法": [], "發音": []}
 
-    st.multiselect("複習範圍：", options, key="temp_sel", on_change=sync_selection, default=st.session_state.sel_ch)
+    st.multiselect("選擇複習章節：", options, key="temp_sel", on_change=sync_selection, default=st.session_state.sel_ch)
     final_ch = all_ch if "ALL 全部單元" in st.session_state.sel_ch else st.session_state.sel_ch
 
     tabs = st.tabs(["📖 單字", "📝 文法造句", "📢 發音"])
@@ -121,42 +123,47 @@ if not df.empty:
                 item = p[0]
                 
                 if cat == "文法":
-                    # 💡 依照妳的設計圖顯示
-                    # 1. 藍色虛線框 (note 欄位)
+                    # 1. 藍色虛線框：顯示 note (文法規則)
                     if item.get('note'):
-                        st.markdown(f'<div class="grammar-rule-box">✨ 練習文法：{item["note"]}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="grammar-rule-box">✨ 文法規則：{item["note"]}</div>', unsafe_allow_html=True)
                     
-                    # 2. 大題目卡 (cn 欄位與 kr 提示)
+                    # 2. 大題目卡：顯示 cn (隨機生成的中文題目)
                     st.markdown(f"""
                     <div class="flashcard-main">
-                        <h2 style="margin-bottom:0px;">{item['cn']}</h2>
-                        <div class="kr-hint">公式提示：{item['kr']}</div>
-                        <br><small style="color:#999;">單元：{item['chapter']}</small>
+                        <h2 style="color: #1A1A1A;">{item['cn']}</h2>
+                        <div class="formula-hint">💡 公式提示：{item['kr']}</div>
+                        <br><br><small style="color: #999;">單元：{item['chapter']}</small>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    st.write("") # 留白
-                    u_in = st.text_input("請輸入完整的韓文造句：", key=f"ex_{cat}_{len(p)}")
+                    st.write("")
+                    # 3. 造句輸入區
+                    # 如果妳 Excel 有 answer 欄位，請將 item['kr'] 改為 item['answer']
+                    u_in = st.text_input("請根據題目與公式造出韓文句子：", key=f"ex_{cat}_{len(p)}")
                 
                 else:
-                    # 一般單字或發音模式
+                    # 一般單字/發音模式
                     st.markdown(f"""<div class="flashcard-main"><h2>{item['cn']}</h2><small>單元：{item['chapter']}</small></div>""", unsafe_allow_html=True)
-                    u_in = st.text_input("輸入韓文回答：", key=f"ex_{cat}_{len(p)}")
+                    u_in = st.text_input("輸入韓文答案：", key=f"ex_{cat}_{len(p)}")
 
-                # 驗證邏輯
-                if st.button("提交驗證", key=f"btn_{cat}"):
-                    # 注意：這裡的驗證會針對妳輸入的內容進行
-                    # 如果是文法題，請在 Excel 另外準備一欄或是直接比對 kr (看妳的 Excel 答案放哪)
-                    # 目前邏輯：比對妳輸入的內容與 Excel 的 kr 欄位 (或妳可以新增一欄叫 answer)
-                    is_ok = clean_text(u_in) == clean_text(str(item['kr']))
+                # 提交驗證
+                if st.button("驗證答案", key=f"btn_{cat}"):
+                    # 這裡比對的是妳輸入的句子 vs Excel 裡的答案
+                    # 建議 Excel 增加一欄 'answer' 放完整正確句子
+                    target_ans = item.get('answer', item['kr']) 
+                    is_ok = clean_text(u_in) == clean_text(str(target_ans))
+                    
                     st.session_state.ex_total += 1
-                    if is_ok: st.success("⭕ 正確！"); st.session_state.ex_correct += 1
-                    else: st.error(f"❌ 錯誤！正確答案參考：{item['kr']}")
-                    play_audio(item['kr'])
+                    if is_ok:
+                        st.success("⭕ 太強了！句子完全正確。"); st.session_state.ex_correct += 1; st.balloons()
+                    else:
+                        st.error(f"❌ 差一點點！正確答案參考：{target_ans}")
+                        st.session_state.wrong_items.append(item)
+                    play_audio(target_ans)
                 
                 if st.button("下一題 ➡️", key=f"nxt_{cat}"): p.pop(0); st.rerun()
             else:
-                st.write("✅ 該類別已完成複習。")
+                st.write("✅ 已完成該章節練習。")
 
 st.divider()
-st.info("宜真加油！💙 照著妳設計的完美練習法，TOPIK 2 絕對沒問題！")
+st.info("宜真加油！💙 照著這個節奏練習，10 月的 TOPIK 考照一定穩！")
