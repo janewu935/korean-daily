@@ -4,17 +4,24 @@ import random
 from gtts import gTTS
 import io
 import re
-from datetime import date
 
-st.set_page_config(page_title="韓語全能練習", page_icon="💙")
+# --- 1. 初始化與頁面設定 ---
+st.set_page_config(page_title="韓語全能挑戰", page_icon="💙")
 
-# --- CSS 樣式 ---
+# CSS 樣式：強化文字對比度
 st.markdown("""
     <style>
     .stApp { background-color: #F8FBFF; }
     .main-title { color: #007FFF !important; font-size: 38px; font-weight: 800; text-align: center; }
     .grammar-rule-box { border: 2px dashed #007FFF; padding: 12px; border-radius: 10px; color: #007FFF; text-align: center; margin-bottom: 20px; background-color: rgba(0, 127, 255, 0.05); font-weight: bold; }
-    .flashcard-main { background-color: #FFFFFF; padding: 40px; border-radius: 20px; border: 1px solid #E6F3FF; text-align: center; box-shadow: 2px 2px 15px rgba(0,0,0,0.05); }
+    
+    /* 🚀 修正：大卡片文字顏色強制加深 */
+    .flashcard-main { 
+        background-color: #FFFFFF; padding: 40px; border-radius: 20px; border: 1px solid #E6F3FF; 
+        text-align: center; box-shadow: 2px 2px 15px rgba(0,0,0,0.05); 
+    }
+    .flashcard-main h2 { color: #333333 !important; font-weight: 800 !important; }
+    
     .formula-hint { background-color: #F1F1F1; color: #555555; padding: 5px 15px; border-radius: 20px; display: inline-block; margin-top: 15px; font-size: 0.9em; }
     .stButton>button { background-color: #007FFF !important; color: white !important; border-radius: 12px; font-weight: bold; }
     .progress-text { color: #007FFF; font-weight: bold; margin-bottom: 5px; text-align: right; font-size: 1.1em; }
@@ -22,18 +29,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. 初始化狀態 ---
-if 'ex_total' not in st.session_state: st.session_state.ex_total = 0
-if 'ex_correct' not in st.session_state: st.session_state.ex_correct = 0
-if 'show_report' not in st.session_state: st.session_state.show_report = False
-if 'wrong_items' not in st.session_state: st.session_state.wrong_items = []
-if 'pools' not in st.session_state: st.session_state.pools = {"單字": [], "文法": [], "發音": []}
-if 'sel_ch' not in st.session_state: st.session_state.sel_ch = ["ALL 全部單元"]
-if 'dq_idx' not in st.session_state: st.session_state.dq_idx = 0
+# 初始化 Session State
+state_keys = {
+    'ex_total': 0, 'ex_correct': 0, 'show_report': False, 
+    'wrong_items': [], 'pools': {"單字": [], "文法": [], "發音": []},
+    'sel_ch': ["ALL 全部單元"], 'dq_idx': 0
+}
+for key, value in state_keys.items():
+    if key not in st.session_state: st.session_state[key] = value
 
 # --- 2. 智慧造句引擎 ---
 def generate_auto_sentence(excel_cn, excel_kr):
-    subjects = [{"cn": "姊姊", "kr": "언니는", "is": "언니예요"}, {"cn": "老師", "kr": "선생님은", "is": "선생님이에요"}, {"cn": "妹妹", "kr": "여동생은", "is": "여동생이에요"}]
+    subjects = [{"cn": "姊姊", "kr": "언니는", "is": "언니예요"}, {"cn": "老師", "kr": "선생님은", "is": "선생님이에요"}, {"cn": "妹妹", "kr": "여動生은", "is": "여동생이에요"}]
     objects = [{"cn": "學生", "kr": "학생", "is": "학생이에요"}, {"cn": "韓國人", "kr": "한국 사람", "is": "한국 사람이에요"}]
     actions = [
         {"cn": "看電影", "root": "영화를 보", "pol": "영화를 봐요", "ing": "영화를 보고 있어요", "hate": "영화를 보기 싫어해요", "neg": "영화를 보지 않아요"},
@@ -66,40 +73,33 @@ def load_data():
 # --- 3. 主介面 ---
 st.markdown('<p class="main-title">💙 韓語全能學習系統 💙</p>', unsafe_allow_html=True)
 
-# 📊 分析報告顯示
+# 分析報告
 if st.session_state.show_report:
-    st.subheader("📊 本輪練習結算")
+    st.subheader("📊 練習成果報告")
     acc = (st.session_state.ex_correct / st.session_state.ex_total * 100) if st.session_state.ex_total > 0 else 0
-    st.metric("整體準確率", f"{acc:.1f}%", f"{st.session_state.ex_correct} / {st.session_state.ex_total}")
-    
+    st.metric("準確率", f"{acc:.1f}%", f"{st.session_state.ex_correct} / {st.session_state.ex_total}")
     if st.session_state.wrong_items:
-        st.write("❌ 錯題清單（請截圖複習）：")
         for w in st.session_state.wrong_items:
             st.markdown(f'<div class="report-card"><b>題目：</b>{w["cn"]}<br><b>正確解答：</b>{w["ans"]}</div>', unsafe_allow_html=True)
-    else:
-        st.success("Perfect! 全部題目都答對了！🎉")
-        
-    if st.button("🔄 開啟新的一輪練習"):
-        st.session_state.ex_total = 0; st.session_state.ex_correct = 0; st.session_state.wrong_items = []; st.session_state.pools = {"單字": [], "文法": [], "發音": []}; st.session_state.show_report = False; st.rerun()
+    if st.button("🔄 重新開始練習"):
+        for k in ['ex_total', 'ex_correct', 'wrong_items', 'show_report']: st.session_state[k] = 0 if isinstance(state_keys[k], int) else state_keys[k]
+        st.session_state.pools = {"單字": [], "文法": [], "發音": []}; st.rerun()
     st.stop()
 
-# ✍️ 每日翻譯挑戰 (手動換題)
+# 每日翻譯挑戰 (手動換題)
 st.subheader("✍️ 每日翻譯挑戰")
-dq_list = [{"cn": "我想喝咖啡。", "kr": "저는 커피를 마시고 싶어요"}, {"cn": "姊姊正在坐火車。", "kr": "언니는 기차를 타고 있어요"}, {"cn": "明天見。", "kr": "내일 봐요"}]
+dq_list = [{"cn": "我想喝咖啡。", "kr": "저는 커피를 마시고 싶어요"}, {"cn": "姊姊正在坐火車。", "kr": "언니는 기차를 타고 있어요"}]
 dq = dq_list[st.session_state.dq_idx % len(dq_list)]
 st.info(f"💡挑戰： 「 {dq['cn']} 」")
-u_dq = st.text_input("輸入挑戰答案：", key="dq_in")
-cd1, cd2 = st.columns(2)
-with cd1:
-    if st.button("驗證挑戰"):
-        if clean_text(u_dq) == clean_text(dq['kr']): st.success("⭕ 正確！"); st.balloons()
-        else: st.error(f"❌ 答案：{dq['kr']}"); play_audio(dq['kr'])
-with cd2:
-    if st.button("下一句 ➡️"): st.session_state.dq_idx += 1; st.rerun()
+u_dq = st.text_input("在此輸入翻譯挑戰答案：", key="dq_main_input")
+if st.button("驗證挑戰結果"):
+    if clean_text(u_dq) == clean_text(dq['kr']): st.success("⭕ 正確！"); st.balloons()
+    else: st.error(f"❌ 答案：{dq['kr']}"); play_audio(dq['kr'])
+if st.button("換下一句挑戰 ➡️"): st.session_state.dq_idx += 1; st.rerun()
 
 st.divider()
 
-# 🎯 Excel 複習區
+# Excel 複習區
 df = load_data()
 if not df.empty:
     all_ch = sorted(df['chapter'].astype(str).unique().tolist())
@@ -110,7 +110,7 @@ if not df.empty:
         else: st.session_state.sel_ch = new
         st.session_state.pools = {"單字": [], "文法": [], "發音": []}
     
-    st.multiselect("複習章節：", ["ALL 全部單元"]+all_ch, key="temp_sel", on_change=sync_sel, default=st.session_state.sel_ch)
+    st.multiselect("選擇複習範圍：", ["ALL 全部單元"]+all_ch, key="temp_sel", on_change=sync_sel, default=st.session_state.sel_ch)
     final_ch = all_ch if "ALL 全部單元" in st.session_state.sel_ch else st.session_state.sel_ch
 
     tabs = st.tabs(["📖 單字", "📝 文法造句", "📢 發音"])
@@ -130,32 +130,31 @@ if not df.empty:
                 st.markdown(f'<p class="progress-text">📝 剩餘：{len(p)} 題</p>', unsafe_allow_html=True)
                 item = p[0]
                 if cat == "文法":
-                    if 'auto_q' not in st.session_state or st.session_state.get('last_item_id') != f"v_{len(p)}":
+                    if 'auto_q' not in st.session_state or st.session_state.get('cur_q_key') != f"v_{len(p)}":
                         st.session_state.auto_q = generate_auto_sentence(item['cn'], item['kr'])
-                        st.session_state.last_item_id = f"v_{len(p)}"
+                        st.session_state.cur_q_key = f"v_{len(p)}"
                     q = st.session_state.auto_q
                     if item.get('note'): st.markdown(f'<div class="grammar-rule-box">✨ 規則：{item["note"]}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="flashcard-main"><h2>{q["cn"]}</h2><div class="formula-hint">💡 公式：{item["kr"]}</div></div>', unsafe_allow_html=True)
-                    u_in = st.text_input("輸入造句：", key=f"q_{cat}_{len(p)}")
-                    target_ans = q['ans']
+                    u_in = st.text_input("輸入完整造句答案：", key=f"in_{cat}_{len(p)}")
+                    ans = q['ans']
                 else:
                     st.markdown(f'<div class="flashcard-main"><h2>{item["cn"]}</h2><small>單元：{item["chapter"]}</small></div>', unsafe_allow_html=True)
-                    u_in = st.text_input("輸入韓文：", key=f"q_{cat}_{len(p)}")
-                    target_ans = item['kr']
+                    u_in = st.text_input("輸入韓文回答：", key=f"in_{cat}_{len(p)}")
+                    ans = item['kr']
 
                 if st.button("提交驗證", key=f"btn_{cat}_{len(p)}"):
                     st.session_state.ex_total += 1
-                    if clean_text(u_in) == clean_text(str(target_ans)):
-                        st.success(f"⭕ 正確！：{target_ans}"); st.session_state.ex_correct += 1; st.balloons()
+                    if clean_text(u_in) == clean_text(str(ans)):
+                        st.success(f"⭕ 正確！解答：{ans}"); st.session_state.ex_correct += 1; st.balloons()
                     else:
-                        st.error(f"❌ 錯誤！正確答案：{target_ans}")
-                        # 💡 關鍵修復：這裡把錯題存進 Session State
-                        st.session_state.wrong_items.append({"cn": q['cn'] if cat=="文法" else item['cn'], "ans": target_ans})
-                    play_audio(target_ans)
+                        st.error(f"❌ 錯誤！正確答案：{ans}")
+                        st.session_state.wrong_items.append({"cn": q['cn'] if cat=="文法" else item['cn'], "ans": ans})
+                    play_audio(ans)
                 
                 if st.button("下一題 ➡️", key=f"nxt_{cat}_{len(p)}"):
                     if 'auto_q' in st.session_state: del st.session_state.auto_q
                     p.pop(0); st.rerun()
-            else: st.write("✅ 已完成複習。")
+            else: st.write("✅ 已完成該章節練習。")
 
-    if st.button("⏹️ 結束練習並看報告"): st.session_state.show_report = True; st.rerun()
+    if st.button("⏹️ 結束測驗並產出報告"): st.session_state.show_report = True; st.rerun()
