@@ -10,7 +10,7 @@ st.set_page_config(page_title="韓語全能練習", page_icon="🌷")
 
 st.markdown("""
     <style>
-    /* 全局背景與字體顏色 (莫蘭迪淡色系) */
+    /* 全局背景與文字顏色 (莫蘭迪淡色系) */
     .stApp { background-color: #FDFCF8; } 
     h1, h2, h3, p, span, label, div { color: #5C5C5C !important; }
     
@@ -24,7 +24,7 @@ st.markdown("""
     .daily-header { font-size: 24px; font-weight: 700; color: #444444; margin-bottom: -15px; }
     
     /* 輸入/結果區域標籤 */
-    .box-label { color: #a3d2e2; font-weight: 700; margin-bottom: 2px; }
+    .box-label { color: #8EB4AC; font-weight: 700; margin-bottom: 2px; }
     
     /* 大卡片設計 */
     .flashcard-box {
@@ -41,6 +41,7 @@ st.markdown("""
         border-radius: 20px; font-size: 0.9em; display: inline-block; margin-top: 15px;
     }
     .rule-tag { color: #93A8AC !important; font-size: 1.1em; margin-bottom: 10px; font-weight: bold; }
+    .answer-tag { color: #8EB4AC !important; font-size: 1.2em; font-weight: bold; margin-top: 15px; }
     
     /* 進度題數顯示 */
     .progress-text { color: #7B9095; font-weight: bold; margin-bottom: 5px; text-align: right; font-size: 1.1em; }
@@ -58,11 +59,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 初始化 Session State
+# 初始化 Session State (已移除發音區)
 state_keys = {
     'ex_total': 0, 'ex_correct': 0, 'show_report': False, 
-    'wrong_items': [], 'pools': {"單字": [], "文法": [], "發音": []},
-    'pool_sizes': {"單字": 0, "文法": 0, "發音": 0}, 
+    'wrong_items': [], 'pools': {"單字": [], "文法": []},
+    'pool_sizes': {"單字": 0, "文法": 0}, 
     'sel_ch': ["ALL 全部單元"], 'dq_idx': 0
 }
 for key, value in state_keys.items():
@@ -88,13 +89,13 @@ if st.session_state.show_report:
     acc = (st.session_state.ex_correct / st.session_state.ex_total * 100) if st.session_state.ex_total > 0 else 0
     st.metric("整體準確率", f"{acc:.1f}%", f"{st.session_state.ex_correct} / {st.session_state.ex_total} 題")
     if st.session_state.wrong_items:
-        st.write("📝 錯題清單 (單字/發音)：")
+        st.write("📝 錯題清單 (單字)：")
         for w in st.session_state.wrong_items:
             st.markdown(f'<div class="report-card"><b>題目：</b>{w["cn"]}<br><b>正確解答：</b>{w["ans"]}</div>', unsafe_allow_html=True)
     if st.button("🔄 返回首頁開啟新練習"):
         for k in ['ex_total', 'ex_correct', 'wrong_items', 'show_report']: st.session_state[k] = 0 if isinstance(state_keys[k], int) else state_keys[k]
-        st.session_state.pools = {"單字": [], "文法": [], "發音": []}
-        st.session_state.pool_sizes = {"單字": 0, "文法": 0, "發音": 0}
+        st.session_state.pools = {"單字": [], "文法": []}
+        st.session_state.pool_sizes = {"單字": 0, "文法": 0}
         st.rerun()
     st.stop()
 
@@ -128,14 +129,15 @@ if not df.empty:
         elif "ALL 全部單元" in new and "ALL 全部單元" not in old: st.session_state.sel_ch = ["ALL 全部單元"]
         elif not new: st.session_state.sel_ch = ["ALL 全部單元"]
         else: st.session_state.sel_ch = new
-        st.session_state.pools = {"單字": [], "文法": [], "發音": []}
-        st.session_state.pool_sizes = {"單字": 0, "文法": 0, "發音": 0}
+        st.session_state.pools = {"單字": [], "文法": []}
+        st.session_state.pool_sizes = {"單字": 0, "文法": 0}
     
     st.multiselect("選擇單元：", ["ALL 全部單元"]+all_ch, key="temp_sel", on_change=sync_sel, default=st.session_state.sel_ch)
     final_ch = all_ch if "ALL 全部單元" in st.session_state.sel_ch else st.session_state.sel_ch
 
-    tabs = st.tabs(["單字", "文法", "發音"])
-    cat_list = ["單字", "文法", "發音"]
+    # 🚀 修改：只保留單字與文法
+    tabs = st.tabs(["📖 單字", "📝 文法造句"])
+    cat_list = ["單字", "文法"]
     
     for i, tab in enumerate(tabs):
         with tab:
@@ -151,7 +153,9 @@ if not df.empty:
             
             p = st.session_state.pools[cat]
             if p:
-                total_q = st.session_state.pool_sizes[cat]
+                # 🚀 修復：加入防呆機制，保證絕對不會出現負數題數
+                total_q = max(len(p), st.session_state.pool_sizes[cat])
+                st.session_state.pool_sizes[cat] = total_q
                 completed_q = total_q - len(p)
                 st.markdown(f'<div class="progress-text">剩餘：{len(p)} / 已完成：{completed_q}</div>', unsafe_allow_html=True)
                 
@@ -159,7 +163,7 @@ if not df.empty:
                 
                 html_card = '<div class="flashcard-box">'
                 
-                # 🚀 變更：文法直接顯示 kr 與 cn
+                # 🚀 修改：文法直接顯示 kr 與 cn
                 if cat == "文法":
                     html_card += f'<h2>{item["kr"]}</h2>'
                     html_card += f'<div class="rule-tag">{item["cn"]}</div>'
@@ -167,8 +171,10 @@ if not df.empty:
                         html_card += f'<div class="hint-tag">💡 備註：{item["note"]}</div>'
                 else:
                     html_card += f'<h2>{item["cn"]}</h2>'
-                    if exam_mode == "複習" and item.get('note'): 
-                        html_card += f'<div class="rule-tag">📌 備註：{item["note"]}</div>'
+                    if exam_mode == "複習":
+                        if item.get('note'): 
+                            html_card += f'<div class="rule-tag">📌 備註：{item["note"]}</div>'
+                        html_card += f'<div class="answer-tag">✅ 解答：{item["kr"]}</div>'
                     target_ans = item['kr']
                 
                 html_card += '</div>'
@@ -184,8 +190,7 @@ if not df.empty:
                             if u_in.strip():
                                 st.session_state.ex_total += 1
                                 st.session_state.ex_correct += 1
-                                st.success("⭕ 造句完成！請點擊下方框框右上角的「複製圖示」，貼給 Gemini 幫妳批改！")
-                                # 💡 產生可一鍵複製的程式碼區塊
+                                st.success("⭕ 句型已記錄！點擊下方框框右上角的「複製圖示」，貼給我幫妳批改！")
                                 copy_text = f"Gemini 請幫我批改這句韓文！\n🎯 目標文法：{item['kr']} ({item['cn']})\n✍️ 我的造句：{u_in}"
                                 st.code(copy_text, language="markdown")
                             else:
