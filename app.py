@@ -10,17 +10,12 @@ st.set_page_config(page_title="韓語全能練習", page_icon="🌷")
 
 st.markdown("""
     <style>
-    /* 全局背景與文字顏色 (莫蘭迪淡色系) */
     .stApp { background-color: #FDFCF8; } 
     h1, h2, h3, p, span, label, div { color: #5C5C5C !important; }
-    
-    /* 區塊標題 */
     .section-title {
         font-size: 22px; font-weight: 800; color: #7B9095 !important; 
         border-bottom: 2px solid #EAE7E0; padding-bottom: 10px; margin-bottom: 20px; margin-top: 20px;
     }
-    
-    /* 大卡片設計 */
     .flashcard-box {
         background-color: #FFFFFF; border: 1px solid #EAE7E0; border-radius: 12px;
         padding: 40px 20px; text-align: center; box-shadow: 2px 2px 10px rgba(0,0,0,0.02);
@@ -28,27 +23,19 @@ st.markdown("""
         justify-content: center; align-items: center;
     }
     .flashcard-box h2 { color: #3A4042 !important; font-weight: 700; margin-bottom: 10px; }
-    
-    /* 文法與提示標籤 */
     .hint-tag {
         background-color: #F4F1EA; color: #8C8C8C !important; padding: 6px 15px;
         border-radius: 20px; font-size: 0.9em; display: inline-block; margin-top: 15px;
     }
     .rule-tag { color: #93A8AC !important; font-size: 1.1em; margin-bottom: 10px; font-weight: bold; }
     .answer-tag { color: #8EB4AC !important; font-size: 1.2em; font-weight: bold; margin-top: 15px; }
-    
-    /* 進度題數顯示 */
     .progress-text { color: #7B9095; font-weight: bold; margin-bottom: 5px; text-align: right; font-size: 1.1em; }
-    
-    /* 按鈕樣式 (淡雅藍綠色) */
     .stButton>button {
         background-color: #A3C4BC !important; color: #FFFFFF !important; border-radius: 8px;
         font-weight: 600; height: 42px; border: none; box-shadow: 1px 1px 5px rgba(163,196,188,0.3);
         transition: background-color 0.3s ease; width: 100%;
     }
     .stButton>button:hover { background-color: #8EB4AC !important; }
-    
-    /* 報告區塊 */
     .report-card { background: #FFFFFF; padding: 15px; border-radius: 8px; border-left: 5px solid #EBBAB9; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
     </style>
     """, unsafe_allow_html=True)
@@ -76,15 +63,15 @@ def load_full_data():
             df = df.fillna("")
             df.columns = [str(c).strip().lower() for c in df.columns]
             
-            # 🚀 讀取每日一句 (包含 note 欄位)
+            # 讀取每日一句 (包含 note 欄位)
             if "每日" in sheet_name:
                 if 'cn' in df.columns and 'kr' in df.columns:
                     cols = ['cn', 'kr']
-                    if 'note' in df.columns: cols.append('note') # 自動檢查是否有 note
+                    if 'note' in df.columns: cols.append('note')
                     valid_df = df[df['cn'] != ""]
                     daily_sentences = valid_df[cols].to_dict('records')
             
-            # 🚀 讀取單元工作表
+            # 讀取單元工作表
             elif 'cn' in df.columns and 'kr' in df.columns and 'type' in df.columns:
                 df['chapter'] = str(sheet_name).strip().upper()
                 chapter_dfs.append(df)
@@ -119,7 +106,7 @@ if st.session_state.show_report:
         st.rerun()
     st.stop()
 
-# ================= 區塊 1：每日一句 (現在會顯示 note 提示) =================
+# ================= 區塊 1：每日一句 =================
 st.markdown('<div class="section-title">每日一句韓語</div>', unsafe_allow_html=True)
 
 dq_source = excel_dq_list if excel_dq_list else [{"cn": "資料讀取中...", "kr": ""}]
@@ -127,23 +114,25 @@ dq = dq_source[st.session_state.dq_idx % len(dq_source)]
 
 st.write(f"**韓語翻譯：** {dq['cn']}")
 
-# 🚀 新增：如果每日一句有 note，就顯示提示標籤
 if dq.get('note'):
     st.markdown(f'<div class="rule-tag">💡 提示：{dq["note"]}</div>', unsafe_allow_html=True)
 
-u_dq = st.text_input("答案：", key="dq_in", label_visibility="collapsed", placeholder="在此輸入您的翻譯...")
+# 🚀 修復：讓 key 綁定當前的 dq_idx，換題時自動生成全新的輸入框！
+u_dq = st.text_input("答案：", key=f"dq_in_{st.session_state.dq_idx}", label_visibility="collapsed", placeholder="在此輸入您的翻譯...")
 
 col_dq1, col_dq2 = st.columns(2)
 with col_dq1:
-    if st.button("檢查", key="chk_dq"):
+    if st.button("檢查", key=f"chk_dq_{st.session_state.dq_idx}"):
         if clean_text(u_dq) == clean_text(dq['kr']): st.success("⭕ 正確！"); st.balloons()
         else: st.error(f"❌ 錯誤！正確解答：{dq['kr']}"); play_audio(dq['kr'])
 with col_dq2:
-    if st.button("下一題", key="nxt_dq"): st.session_state.dq_idx += 1; st.rerun()
+    if st.button("下一題", key=f"nxt_dq_{st.session_state.dq_idx}"): 
+        st.session_state.dq_idx += 1
+        st.rerun()
 
 st.divider()
 
-# ================= 區塊 2：單元複習/考試 (邏輯不變) =================
+# ================= 區塊 2：單元複習/考試 =================
 st.markdown('<div class="section-title">單元複習 / 考試</div>', unsafe_allow_html=True)
 
 exam_mode = st.radio("模式選擇：", ["複習", "考試"], horizontal=True, key="exam_mode_radio")
@@ -179,7 +168,8 @@ if not df.empty:
             
             p = st.session_state.pools[cat]
             if p:
-                total_q = st.session_state.pool_sizes[cat]
+                total_q = max(len(p), st.session_state.pool_sizes[cat])
+                st.session_state.pool_sizes[cat] = total_q
                 completed_q = total_q - len(p)
                 st.markdown(f'<div class="progress-text">剩餘：{len(p)} / 已完成：{completed_q}</div>', unsafe_allow_html=True)
                 
@@ -198,11 +188,14 @@ if not df.empty:
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("檢查", key=f"btn_{cat}_{len(p)}"):
-                        st.session_state.ex_total += 1
                         if cat == "文法":
-                            st.success("⭕ 造句完成！請貼給 Gemini 批改。")
-                            st.code(f"批改文法：{item['kr']} ({item['cn']})\n我的造句：{u_in}", language="markdown")
+                            st.session_state.ex_total += 1
+                            st.session_state.ex_correct += 1
+                            st.success("⭕ 造句完成！請點擊右上方複製貼給 Gemini 批改。")
+                            copy_text = f"Gemini 請幫我批改這句韓文！\n🎯 目標文法：{item['kr']} ({item['cn']})\n✍️ 我的造句：{u_in}"
+                            st.code(copy_text, language="markdown")
                         else:
+                            st.session_state.ex_total += 1
                             if clean_text(u_in) == clean_text(str(item['kr'])):
                                 st.success("⭕ 正確！"); st.session_state.ex_correct += 1; st.balloons()
                             else:
