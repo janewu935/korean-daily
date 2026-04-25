@@ -59,7 +59,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 初始化 Session State (已移除發音區)
+# 初始化 Session State
 state_keys = {
     'ex_total': 0, 'ex_correct': 0, 'show_report': False, 
     'wrong_items': [], 'pools': {"單字": [], "文法": []},
@@ -77,8 +77,24 @@ def play_audio(text):
 
 @st.cache_data(ttl=5)
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/export?format=csv&gid=0"
-    try: df = pd.read_csv(url).fillna(""); df.columns = [c.strip().lower() for c in df.columns]; return df
+    # 🚀 修改：改為匯出整份 xlsx，以支援多工作表讀取
+    url = "https://docs.google.com/spreadsheets/d/1dcEYmAqIYng4YFFAT98Uxy_NXskGQaAAidCzzORuJag/export?format=xlsx"
+    try: 
+        # sheet_name=None 會將所有工作表讀成一個 Dictionary
+        xls = pd.read_excel(url, sheet_name=None, engine='openpyxl')
+        all_dfs = []
+        for sheet_name, df in xls.items():
+            df = df.fillna("")
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            # 確保該工作表有我們要的欄位再匯入
+            if 'cn' in df.columns and 'kr' in df.columns and 'type' in df.columns:
+                # 💡 自動把工作表的名稱（如 CH5）當作這批資料的章節！
+                df['chapter'] = str(sheet_name).strip().upper()
+                all_dfs.append(df)
+        
+        if all_dfs:
+            return pd.concat(all_dfs, ignore_index=True)
+        return pd.DataFrame()
     except: return pd.DataFrame()
 
 # --- 3. 介面呈現 ---
@@ -135,7 +151,6 @@ if not df.empty:
     st.multiselect("選擇單元：", ["ALL 全部單元"]+all_ch, key="temp_sel", on_change=sync_sel, default=st.session_state.sel_ch)
     final_ch = all_ch if "ALL 全部單元" in st.session_state.sel_ch else st.session_state.sel_ch
 
-    # 🚀 修改：只保留單字與文法
     tabs = st.tabs(["📖 單字", "📝 文法造句"])
     cat_list = ["單字", "文法"]
     
@@ -153,7 +168,6 @@ if not df.empty:
             
             p = st.session_state.pools[cat]
             if p:
-                # 🚀 修復：加入防呆機制，保證絕對不會出現負數題數
                 total_q = max(len(p), st.session_state.pool_sizes[cat])
                 st.session_state.pool_sizes[cat] = total_q
                 completed_q = total_q - len(p)
@@ -163,7 +177,6 @@ if not df.empty:
                 
                 html_card = '<div class="flashcard-box">'
                 
-                # 🚀 修改：文法直接顯示 kr 與 cn
                 if cat == "文法":
                     html_card += f'<h2>{item["kr"]}</h2>'
                     html_card += f'<div class="rule-tag">{item["cn"]}</div>'
