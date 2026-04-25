@@ -63,7 +63,7 @@ def load_full_data():
             df = df.fillna("")
             df.columns = [str(c).strip().lower() for c in df.columns]
             
-            # 讀取每日一句 (包含 note 欄位)
+            # 讀取每日一句
             if "每日" in sheet_name:
                 if 'cn' in df.columns and 'kr' in df.columns:
                     cols = ['cn', 'kr']
@@ -117,14 +117,19 @@ st.write(f"**韓語翻譯：** {dq['cn']}")
 if dq.get('note'):
     st.markdown(f'<div class="rule-tag">💡 提示：{dq["note"]}</div>', unsafe_allow_html=True)
 
-# 🚀 修復：讓 key 綁定當前的 dq_idx，換題時自動生成全新的輸入框！
 u_dq = st.text_input("答案：", key=f"dq_in_{st.session_state.dq_idx}", label_visibility="collapsed", placeholder="在此輸入您的翻譯...")
 
 col_dq1, col_dq2 = st.columns(2)
 with col_dq1:
     if st.button("檢查", key=f"chk_dq_{st.session_state.dq_idx}"):
-        if clean_text(u_dq) == clean_text(dq['kr']): st.success("⭕ 正確！"); st.balloons()
-        else: st.error(f"❌ 錯誤！正確解答：{dq['kr']}"); play_audio(dq['kr'])
+        if clean_text(u_dq) == clean_text(dq['kr']): 
+            st.success("⭕ 正確！")
+            st.balloons()
+        else: 
+            st.error(f"❌ 錯誤！正確解答：{dq['kr']}")
+        # 🚀 修改：無論對錯都會播放語音
+        play_audio(dq['kr'])
+        
 with col_dq2:
     if st.button("下一題", key=f"nxt_dq_{st.session_state.dq_idx}"): 
         st.session_state.dq_idx += 1
