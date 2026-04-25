@@ -11,7 +11,7 @@ st.set_page_config(page_title="韓語全能練習", page_icon="🌷")
 st.markdown("""
     <style>
     /* 全局背景與字體顏色 (莫蘭迪淡色系) */
-    .stApp { background-color: #FDFCF8; }
+    .stApp { background-color: #FDFCF8; } 
     h1, h2, h3, p, span, label, div { color: #5C5C5C !important; }
     
     /* 區塊標題 */
@@ -24,9 +24,9 @@ st.markdown("""
     .daily-header { font-size: 24px; font-weight: 700; color: #444444; margin-bottom: -15px; }
     
     /* 輸入/結果區域標籤 */
-    .box-label { color: #8EB4AC; font-weight: 700; margin-bottom: 2px; }
+    .box-label { color: #a3d2e2; font-weight: 700; margin-bottom: 2px; }
     
-    /* 🚀 修復：大卡片設計，確保內容置中包覆 */
+    /* 大卡片設計 */
     .flashcard-box {
         background-color: #FFFFFF; border: 1px solid #EAE7E0; border-radius: 12px;
         padding: 40px 20px; text-align: center; box-shadow: 2px 2px 10px rgba(0,0,0,0.02);
@@ -40,8 +40,7 @@ st.markdown("""
         background-color: #F4F1EA; color: #8C8C8C !important; padding: 6px 15px;
         border-radius: 20px; font-size: 0.9em; display: inline-block; margin-top: 15px;
     }
-    .rule-tag { color: #93A8AC !important; font-size: 0.9em; margin-bottom: 10px; font-weight: bold; }
-    .answer-tag { color: #8EB4AC !important; font-size: 1.2em; font-weight: bold; margin-top: 15px; }
+    .rule-tag { color: #93A8AC !important; font-size: 1.1em; margin-bottom: 10px; font-weight: bold; }
     
     /* 進度題數顯示 */
     .progress-text { color: #7B9095; font-weight: bold; margin-bottom: 5px; text-align: right; font-size: 1.1em; }
@@ -55,41 +54,21 @@ st.markdown("""
     .stButton>button:hover { background-color: #8EB4AC !important; }
     
     /* 報告區塊 */
-    .report-card {
-        background: #FFFFFF; padding: 15px; border-radius: 8px;
-        border-left: 5px solid #EBBAB9; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-    }
+    .report-card { background: #FFFFFF; padding: 15px; border-radius: 8px; border-left: 5px solid #EBBAB9; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 初始化狀態 ---
+# 初始化 Session State
 state_keys = {
     'ex_total': 0, 'ex_correct': 0, 'show_report': False, 
     'wrong_items': [], 'pools': {"單字": [], "文法": [], "發音": []},
-    'pool_sizes': {"單字": 0, "文法": 0, "發音": 0}, # 紀錄總題數
+    'pool_sizes': {"單字": 0, "文法": 0, "發音": 0}, 
     'sel_ch': ["ALL 全部單元"], 'dq_idx': 0
 }
 for key, value in state_keys.items():
     if key not in st.session_state: st.session_state[key] = value
 
-# --- 3. 核心函數 ---
-def generate_auto_sentence(excel_cn, excel_kr):
-    subjects = [{"cn": "姊姊", "kr": "언니는", "is": "언니예요"}, {"cn": "老師", "kr": "선생님은", "is": "선생님이에요"}, {"cn": "妹妹", "kr": "여동생은", "is": "여동생이에요"}, {"cn": "我", "kr": "저는", "is": "저예요"}]
-    objects = [{"cn": "學生", "kr": "학생", "is": "학생이에요"}, {"cn": "韓國人", "kr": "한국 사람", "is": "한국 사람이에요"}, {"cn": "醫生", "kr": "의사", "is": "의사예요"}]
-    actions = [
-        {"cn": "看電影", "root": "영화를 보", "pol": "영화를 봐요", "ing": "영화를 보고 있어요", "want": "영화를 보고 싶어요", "hate": "영화를 보기 싫어해요", "neg": "영화를 보지 않아요"},
-        {"cn": "喝咖啡", "root": "커피를 마시", "pol": "커피를 마셔요", "ing": "커피를 마시고 있어요", "want": "커피를 마시고 싶어요", "hate": "커피를 마시기 싫어해요", "neg": "커피를 마시지 않아요"},
-        {"cn": "吃麵包", "root": "빵을 먹", "pol": "빵을 먹어요", "ing": "빵을 먹고 있어요", "want": "빵을 먹고 싶어요", "hate": "빵을 먹기 싫어해요", "neg": "빵을 먹지 않아요"}
-    ]
-    sub = random.choice(subjects); obj = random.choice(objects); act = random.choice(actions)
-    label = str(excel_cn)
-    if "是＋名詞" in label or "예요" in str(excel_kr): return {"cn": f"{sub['cn']}是{obj['cn']}。", "ans": f"{sub['kr']} {obj['is']}"}
-    elif "正在" in label: return {"cn": f"{sub['cn']}正在{act['cn']}。", "ans": f"{sub['kr']} {act['ing']}"}
-    elif "不想" in label: return {"cn": f"{sub['cn']}不想{act['cn']}。", "ans": f"{sub['kr']} {act['hate']}"}
-    elif "想" in label: return {"cn": f"{sub['cn']}想{act['cn']}。", "ans": f"{sub['kr']} {act['want']}"}
-    elif "不＋" in label: return {"cn": f"{sub['cn']}不{act['cn']}。", "ans": f"{sub['kr']} {act['neg']}"}
-    else: return {"cn": f"{sub['cn']}{act['cn']}。", "ans": f"{sub['kr']} {act['pol']}"}
-
+# --- 2. 輔助函數 ---
 def clean_text(text): return re.sub(r'[^\w\s]', '', str(text)).replace(" ", "").strip()
 def play_audio(text):
     try: tts = gTTS(text=str(text), lang='ko'); fp = io.BytesIO(); tts.write_to_fp(fp); st.audio(fp)
@@ -101,19 +80,22 @@ def load_data():
     try: df = pd.read_csv(url).fillna(""); df.columns = [c.strip().lower() for c in df.columns]; return df
     except: return pd.DataFrame()
 
-# --- 4. 介面呈現 ---
+# --- 3. 介面呈現 ---
 
+# 📊 報告頁面
 if st.session_state.show_report:
     st.markdown('<div class="section-title">📊 練習報告結算</div>', unsafe_allow_html=True)
     acc = (st.session_state.ex_correct / st.session_state.ex_total * 100) if st.session_state.ex_total > 0 else 0
     st.metric("整體準確率", f"{acc:.1f}%", f"{st.session_state.ex_correct} / {st.session_state.ex_total} 題")
     if st.session_state.wrong_items:
-        st.write("📝 錯題清單：")
+        st.write("📝 錯題清單 (單字/發音)：")
         for w in st.session_state.wrong_items:
             st.markdown(f'<div class="report-card"><b>題目：</b>{w["cn"]}<br><b>正確解答：</b>{w["ans"]}</div>', unsafe_allow_html=True)
     if st.button("🔄 返回首頁開啟新練習"):
         for k in ['ex_total', 'ex_correct', 'wrong_items', 'show_report']: st.session_state[k] = 0 if isinstance(state_keys[k], int) else state_keys[k]
-        st.session_state.pools = {"單字": [], "文法": [], "發音": []}; st.rerun()
+        st.session_state.pools = {"單字": [], "文法": [], "發音": []}
+        st.session_state.pool_sizes = {"單字": 0, "文法": 0, "發音": 0}
+        st.rerun()
     st.stop()
 
 # ================= 區塊 1：每日一句 =================
@@ -135,8 +117,7 @@ with col_dq2:
 # ================= 區塊 2：單元複習/考試 =================
 st.markdown('<div class="section-title">單元複習 / 考試</div>', unsafe_allow_html=True)
 
-# 🚀 修復：模式選擇按鈕回歸
-exam_mode = st.radio("模式選擇：", ["複習", "考試"], horizontal=True, key="mode_radio")
+exam_mode = st.radio("模式選擇：", ["複習", "考試"], horizontal=True, key="exam_mode_radio")
 
 df = load_data()
 if not df.empty:
@@ -148,6 +129,7 @@ if not df.empty:
         elif not new: st.session_state.sel_ch = ["ALL 全部單元"]
         else: st.session_state.sel_ch = new
         st.session_state.pools = {"單字": [], "文法": [], "發音": []}
+        st.session_state.pool_sizes = {"單字": 0, "文法": 0, "發音": 0}
     
     st.multiselect("選擇單元：", ["ALL 全部單元"]+all_ch, key="temp_sel", on_change=sync_sel, default=st.session_state.sel_ch)
     final_ch = all_ch if "ALL 全部單元" in st.session_state.sel_ch else st.session_state.sel_ch
@@ -159,73 +141,72 @@ if not df.empty:
         with tab:
             cat = cat_list[i]
             
-            # 初始化題目池
-            if not st.session_state.pools[cat]:
+            if not st.session_state.pools[cat] and st.session_state.pool_sizes[cat] == 0:
                 curr_df = df[(df['type'] == cat) & (df['chapter'].astype(str).isin(final_ch))]
                 if not curr_df.empty:
                     pool_list = curr_df.to_dict('records')
                     random.shuffle(pool_list)
                     st.session_state.pools[cat] = pool_list
-                    st.session_state.pool_sizes[cat] = len(pool_list) # 紀錄總題數
-                else:
-                    st.session_state.pool_sizes[cat] = 0
+                    st.session_state.pool_sizes[cat] = len(pool_list)
             
             p = st.session_state.pools[cat]
             if p:
-                # 🚀 修復：動態計算剩餘/已完成
                 total_q = st.session_state.pool_sizes[cat]
                 completed_q = total_q - len(p)
-                st.markdown(f'<div class="progress-text">剩餘：{len(p)} / {completed_q}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="progress-text">剩餘：{len(p)} / 已完成：{completed_q}</div>', unsafe_allow_html=True)
                 
                 item = p[0]
                 
-                # 🚀 修復：完整包覆的 HTML 字串，解決白框問題與模式顯示邏輯
                 html_card = '<div class="flashcard-box">'
                 
+                # 🚀 變更：文法直接顯示 kr 與 cn
                 if cat == "文法":
-                    if 'auto_q' not in st.session_state or st.session_state.get('cur_q_key') != f"v_{len(p)}":
-                        st.session_state.auto_q = generate_auto_sentence(item['cn'], item['kr'])
-                        st.session_state.cur_q_key = f"v_{len(p)}"
-                    q = st.session_state.auto_q
-                    target_ans = q['ans']
-                    
-                    html_card += f'<h2>{q["cn"]}</h2>'
-                    # 若為複習模式，顯示解答與提示
-                    if exam_mode == "複習":
-                        if item.get('note'): html_card += f'<div class="rule-tag">📌 規則：{item["note"]}</div>'
-                        html_card += f'<div class="hint-tag">💡 公式提示：{item["kr"]}</div>'
-                        html_card += f'<div class="answer-tag">✅ 解答：{target_ans}</div>'
-                        
+                    html_card += f'<h2>{item["kr"]}</h2>'
+                    html_card += f'<div class="rule-tag">{item["cn"]}</div>'
+                    if exam_mode == "複習" and item.get('note'): 
+                        html_card += f'<div class="hint-tag">💡 備註：{item["note"]}</div>'
                 else:
-                    target_ans = item['kr']
                     html_card += f'<h2>{item["cn"]}</h2>'
-                    # 若為複習模式，顯示解答與提示
-                    if exam_mode == "複習":
-                        if item.get('note'): html_card += f'<div class="rule-tag">📌 備註：{item["note"]}</div>'
-                        html_card += f'<div class="answer-tag">✅ 解答：{target_ans}</div>'
+                    if exam_mode == "複習" and item.get('note'): 
+                        html_card += f'<div class="rule-tag">📌 備註：{item["note"]}</div>'
+                    target_ans = item['kr']
                 
                 html_card += '</div>'
-                st.markdown(html_card, unsafe_allow_html=True) # 一次渲染整張卡片
+                st.markdown(html_card, unsafe_allow_html=True)
 
-                st.markdown('<p class="box-label">答案：</p>', unsafe_allow_html=True)
+                st.markdown('<p class="box-label">造句 / 答案：</p>', unsafe_allow_html=True)
                 u_in = st.text_input("", key=f"in_{cat}_{len(p)}", label_visibility="collapsed", placeholder="請輸入韓文...")
                 
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("檢查", key=f"btn_{cat}_{len(p)}"):
-                        st.session_state.ex_total += 1
-                        if clean_text(u_in) == clean_text(str(target_ans)):
-                            st.success(f"⭕ 正確解答：{target_ans}"); st.session_state.ex_correct += 1; st.balloons()
+                        if cat == "文法":
+                            if u_in.strip():
+                                st.session_state.ex_total += 1
+                                st.session_state.ex_correct += 1
+                                st.success("⭕ 造句完成！請點擊下方框框右上角的「複製圖示」，貼給 Gemini 幫妳批改！")
+                                # 💡 產生可一鍵複製的程式碼區塊
+                                copy_text = f"Gemini 請幫我批改這句韓文！\n🎯 目標文法：{item['kr']} ({item['cn']})\n✍️ 我的造句：{u_in}"
+                                st.code(copy_text, language="markdown")
+                            else:
+                                st.error("❌ 請先輸入您的造句喔！")
                         else:
-                            st.error(f"❌ 錯誤！正確解答：{target_ans}")
-                            st.session_state.wrong_items.append({"cn": q['cn'] if cat=="文法" else item['cn'], "ans": target_ans})
-                        play_audio(target_ans)
+                            st.session_state.ex_total += 1
+                            if clean_text(u_in) == clean_text(str(target_ans)):
+                                st.success(f"⭕ 正確解答：{item['kr']}"); st.session_state.ex_correct += 1; st.balloons()
+                            else:
+                                st.error(f"❌ 錯誤！正確解答：{item['kr']}")
+                                st.session_state.wrong_items.append({"cn": item['cn'], "ans": item['kr']})
+                            play_audio(item['kr'])
+                            
                 with col2:
                     if st.button("下一題", key=f"nxt_{cat}_{len(p)}"):
-                        if 'auto_q' in st.session_state: del st.session_state.auto_q
                         p.pop(0); st.rerun()
             else:
                 st.write("✅ 該範圍已練習完畢。")
+                if st.session_state.pool_sizes[cat] > 0:
+                    if st.button(f"重啟{cat}練習", key=f"reset_{cat}"):
+                        st.session_state.pool_sizes[cat] = 0; st.rerun()
 
     st.write("") 
     if st.button("結束 (同步產出複習報告)", key="end_btn"): st.session_state.show_report = True; st.rerun()
