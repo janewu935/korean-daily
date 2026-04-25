@@ -5,14 +5,13 @@ from gtts import gTTS
 import io
 import re
 
-# --- 1. 初始化與頁面設定 ---
+# --- 1. 頁面設定與淡雅色系 CSS ---
 st.set_page_config(page_title="韓語全能練習", page_icon="🌷")
 
-# 客製化淡色系 CSS 樣式
 st.markdown("""
     <style>
-    /* 全局背景與文字顏色 */
-    .stApp { background-color: #FDFCF8; } 
+    /* 全局背景與字體顏色 (莫蘭迪淡色系) */
+    .stApp { background-color: #FDFCF8; }
     h1, h2, h3, p, span, label, div { color: #5C5C5C !important; }
     
     /* 區塊標題 */
@@ -25,9 +24,9 @@ st.markdown("""
     .daily-header { font-size: 24px; font-weight: 700; color: #444444; margin-bottom: -15px; }
     
     /* 輸入/結果區域標籤 */
-    .box-label { color: #a3d2e2; font-weight: 700; margin-bottom: 2px; }
+    .box-label { color: #8EB4AC; font-weight: 700; margin-bottom: 2px; }
     
-    /* 大卡片設計 (修復白框問題) */
+    /* 🚀 修復：大卡片設計，確保內容置中包覆 */
     .flashcard-box {
         background-color: #FFFFFF; border: 1px solid #EAE7E0; border-radius: 12px;
         padding: 40px 20px; text-align: center; box-shadow: 2px 2px 10px rgba(0,0,0,0.02);
@@ -42,6 +41,7 @@ st.markdown("""
         border-radius: 20px; font-size: 0.9em; display: inline-block; margin-top: 15px;
     }
     .rule-tag { color: #93A8AC !important; font-size: 0.9em; margin-bottom: 10px; font-weight: bold; }
+    .answer-tag { color: #8EB4AC !important; font-size: 1.2em; font-weight: bold; margin-top: 15px; }
     
     /* 進度題數顯示 */
     .progress-text { color: #7B9095; font-weight: bold; margin-bottom: 5px; text-align: right; font-size: 1.1em; }
@@ -50,26 +50,29 @@ st.markdown("""
     .stButton>button {
         background-color: #A3C4BC !important; color: #FFFFFF !important; border-radius: 8px;
         font-weight: 600; height: 42px; border: none; box-shadow: 1px 1px 5px rgba(163,196,188,0.3);
-        transition: background-color 0.3s ease;
+        transition: background-color 0.3s ease; width: 100%;
     }
     .stButton>button:hover { background-color: #8EB4AC !important; }
     
     /* 報告區塊 */
-    .report-card { background: #FFFFFF; padding: 15px; border-radius: 8px; border-left: 5px solid #EBBAB9; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+    .report-card {
+        background: #FFFFFF; padding: 15px; border-radius: 8px;
+        border-left: 5px solid #EBBAB9; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 初始化 Session State
+# --- 2. 初始化狀態 ---
 state_keys = {
     'ex_total': 0, 'ex_correct': 0, 'show_report': False, 
     'wrong_items': [], 'pools': {"單字": [], "文法": [], "發音": []},
-    'pool_sizes': {"單字": 0, "文法": 0, "發音": 0}, # 新增：記錄每個分類的總題數
-    'sel_ch': ["ALL 全部單元"], 'dq_idx': 0, 'exam_mode': "複習"
+    'pool_sizes': {"單字": 0, "文法": 0, "發音": 0}, # 紀錄總題數
+    'sel_ch': ["ALL 全部單元"], 'dq_idx': 0
 }
 for key, value in state_keys.items():
     if key not in st.session_state: st.session_state[key] = value
 
-# --- 2. 智慧造句引擎 ---
+# --- 3. 核心函數 ---
 def generate_auto_sentence(excel_cn, excel_kr):
     subjects = [{"cn": "姊姊", "kr": "언니는", "is": "언니예요"}, {"cn": "老師", "kr": "선생님은", "is": "선생님이에요"}, {"cn": "妹妹", "kr": "여동생은", "is": "여동생이에요"}, {"cn": "我", "kr": "저는", "is": "저예요"}]
     objects = [{"cn": "學生", "kr": "학생", "is": "학생이에요"}, {"cn": "韓國人", "kr": "한국 사람", "is": "한국 사람이에요"}, {"cn": "醫生", "kr": "의사", "is": "의사예요"}]
@@ -98,7 +101,7 @@ def load_data():
     try: df = pd.read_csv(url).fillna(""); df.columns = [c.strip().lower() for c in df.columns]; return df
     except: return pd.DataFrame()
 
-# --- 3. 介面呈現 ---
+# --- 4. 介面呈現 ---
 
 if st.session_state.show_report:
     st.markdown('<div class="section-title">📊 練習報告結算</div>', unsafe_allow_html=True)
@@ -132,8 +135,8 @@ with col_dq2:
 # ================= 區塊 2：單元複習/考試 =================
 st.markdown('<div class="section-title">單元複習 / 考試</div>', unsafe_allow_html=True)
 
-# 修復：讓 radio 正常顯示
-exam_mode = st.radio("模式選擇：", ["複習", "考試"], horizontal=True, key="exam_mode_radio")
+# 🚀 修復：模式選擇按鈕回歸
+exam_mode = st.radio("模式選擇：", ["複習", "考試"], horizontal=True, key="mode_radio")
 
 df = load_data()
 if not df.empty:
@@ -156,45 +159,53 @@ if not df.empty:
         with tab:
             cat = cat_list[i]
             
-            # 初始化題目池與總題數記錄
+            # 初始化題目池
             if not st.session_state.pools[cat]:
                 curr_df = df[(df['type'] == cat) & (df['chapter'].astype(str).isin(final_ch))]
                 if not curr_df.empty:
-                    st.session_state.pools[cat] = curr_df.to_dict('records')
-                    st.session_state.pool_sizes[cat] = len(st.session_state.pools[cat]) # 紀錄初始總題數
-                    random.shuffle(st.session_state.pools[cat])
+                    pool_list = curr_df.to_dict('records')
+                    random.shuffle(pool_list)
+                    st.session_state.pools[cat] = pool_list
+                    st.session_state.pool_sizes[cat] = len(pool_list) # 紀錄總題數
+                else:
+                    st.session_state.pool_sizes[cat] = 0
             
             p = st.session_state.pools[cat]
             if p:
-                # 🎯 計算並顯示進度：剩餘 / 已完成
+                # 🚀 修復：動態計算剩餘/已完成
                 total_q = st.session_state.pool_sizes[cat]
                 completed_q = total_q - len(p)
                 st.markdown(f'<div class="progress-text">剩餘：{len(p)} / {completed_q}</div>', unsafe_allow_html=True)
                 
                 item = p[0]
                 
-                # 🛠️ 修復白框與排版：將 HTML 包裝成單一字串再一次渲染
+                # 🚀 修復：完整包覆的 HTML 字串，解決白框問題與模式顯示邏輯
                 html_card = '<div class="flashcard-box">'
+                
                 if cat == "文法":
                     if 'auto_q' not in st.session_state or st.session_state.get('cur_q_key') != f"v_{len(p)}":
                         st.session_state.auto_q = generate_auto_sentence(item['cn'], item['kr'])
                         st.session_state.cur_q_key = f"v_{len(p)}"
                     q = st.session_state.auto_q
-                    html_card += f'<h2>{q["cn"]}</h2>'
+                    target_ans = q['ans']
                     
+                    html_card += f'<h2>{q["cn"]}</h2>'
+                    # 若為複習模式，顯示解答與提示
                     if exam_mode == "複習":
                         if item.get('note'): html_card += f'<div class="rule-tag">📌 規則：{item["note"]}</div>'
-                        html_card += f'<div class="hint-tag">💡 公式：{item["kr"]}</div>'
-                    target_ans = q['ans']
+                        html_card += f'<div class="hint-tag">💡 公式提示：{item["kr"]}</div>'
+                        html_card += f'<div class="answer-tag">✅ 解答：{target_ans}</div>'
+                        
                 else:
-                    html_card += f'<h2>{item["cn"]}</h2>'
-                    if exam_mode == "複習" and item.get('note'):
-                        html_card += f'<div class="rule-tag">📌 {item["note"]}</div>'
                     target_ans = item['kr']
-                html_card += '</div>'
+                    html_card += f'<h2>{item["cn"]}</h2>'
+                    # 若為複習模式，顯示解答與提示
+                    if exam_mode == "複習":
+                        if item.get('note'): html_card += f'<div class="rule-tag">📌 備註：{item["note"]}</div>'
+                        html_card += f'<div class="answer-tag">✅ 解答：{target_ans}</div>'
                 
-                # 渲染完整的卡片
-                st.markdown(html_card, unsafe_allow_html=True)
+                html_card += '</div>'
+                st.markdown(html_card, unsafe_allow_html=True) # 一次渲染整張卡片
 
                 st.markdown('<p class="box-label">答案：</p>', unsafe_allow_html=True)
                 u_in = st.text_input("", key=f"in_{cat}_{len(p)}", label_visibility="collapsed", placeholder="請輸入韓文...")
